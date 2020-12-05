@@ -144,19 +144,19 @@ def getInfo(filename):
             if files[0] == "Document.xml":
                 doc = str(zfile.read(files[0]))
                 doc = doc.replace("\n"," ")
-                r = re.findall("Property name=\"CreatedBy.*?String value=\"(.*?)\"\/>",doc)
+                r = re.findall("Property name=\"CreatedBy.*?String value=\"(.*?)\"/>",doc)
                 if r:
                     author = r[0]
                     # remove email if present in author field
                     if "&lt;" in author:
                         author = author.split("&lt;")[0].strip()
-                r = re.findall("Property name=\"Company.*?String value=\"(.*?)\"\/>",doc)
+                r = re.findall("Property name=\"Company.*?String value=\"(.*?)\"/>",doc)
                 if r:
                     company = r[0]
-                r = re.findall("Property name=\"License.*?String value=\"(.*?)\"\/>",doc)
+                r = re.findall("Property name=\"License.*?String value=\"(.*?)\"/>",doc)
                 if r:
                     lic = r[0]
-                r = re.findall("Property name=\"Comment.*?String value=\"(.*?)\"\/>",doc)
+                r = re.findall("Property name=\"Comment.*?String value=\"(.*?)\"/>",doc)
                 if r:
                     descr = r[0]
                 if "thumbnails/Thumbnail.png" in files:
@@ -478,7 +478,7 @@ def handle():
                     xpm = w.Icon
                     if "XPM" in xpm:
                         xpm = xpm.replace("\n        ","\n") # some XPMs have some indent that QT doesn't like
-                        r = [s[:-1].strip('"') for s in re.findall("(?s)\{(.*?)\};",xpm)[0].split("\n")[1:]]
+                        r = [s[:-1].strip('"') for s in re.findall("(?s)\\{(.*?)\\};",xpm)[0].split("\n")[1:]]
                         p = QtGui.QPixmap(r)
                         p = p.scaled(24,24)
                         img = tempfile.mkstemp(dir=tempfolder,suffix='.png')[1]
