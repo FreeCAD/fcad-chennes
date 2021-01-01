@@ -50,5 +50,3 @@ for pin in pinnedFiles:
     parameterName = "PIN" + str(counter)
     pinnedFilesGroup.SetString(parameterName, pin)
     counter += 1
-
-pinnedFilesGroup.NotifyAll()

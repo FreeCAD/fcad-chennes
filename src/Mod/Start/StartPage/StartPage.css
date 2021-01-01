@@ -119,23 +119,18 @@ a .caption, a .caption:link, a .caption:visited {
 .caption p {
     font-weight: normal;
 }
+
+.dynamicicon {
+    opacity: 0.1;
+    margin: 0px;
+    padding: 0px;
+}
 img.pincard {
     width: 12px;
     height: 12px;
     position: absolute;
     top: 3px;
     right: 20px;
-    margin: 0px;
-    padding: 0px;
-}
-img.pinactivecard {
-    width: 12px;
-    height: 12px;
-    position: absolute;
-    top: 3px;
-    right: 20px;
-    margin: 0px;
-    padding: 0px;
 }
 img.removecard {
     width: 12px;
@@ -143,8 +138,6 @@ img.removecard {
     position: absolute;
     top: 3px;
     right: 3px;
-    margin: 0px;
-    padding: 0px;
 }
 
 .docbox a:hover {

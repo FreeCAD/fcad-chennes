@@ -1,6 +1,8 @@
 var allowDownloads = 0;
 var showForum = 0;
 var wblist = [];
+var originalOpacity = 0.0;
+var fullOpacity = 1.0;
 
 function toggle(tab) {
 
@@ -111,16 +113,22 @@ function printForum(data) {
 }
 
 
+
+// Functions for removing and pinning recent files
+
+
 function mouseEnterCard(hash) {
 
     pin_element = document.getElementById('pin_' + hash);
     unpin_element = document.getElementById('unpin_' + hash);
     remove_element = document.getElementById('remove_' + hash);
 
-    pin_element.style.opacity = 1.0;
-    unpin_element.style.opacity = 1.0;
-    remove_element.style.opacity = 1.0;
+    // Store off the old opacity that was set in the stylesheet
+    originalOpacity = pin_element.style.opacity;
 
+    pin_element.style.opacity = fullOpacity;
+    unpin_element.style.opacity = fullOpacity;
+    remove_element.style.opacity = fullOpacity;
 }
 
 function mouseLeaveCard(hash) {
@@ -129,10 +137,9 @@ function mouseLeaveCard(hash) {
     unpin_element = document.getElementById('unpin_' + hash);
     remove_element = document.getElementById('remove_' + hash);
 
-    pin_element.style.opacity = 0.05;
-    unpin_element.style.opacity = 0.05;
-    remove_element.style.opacity = 0.05;
-
+    pin_element.style.opacity = originalOpacity;
+    unpin_element.style.opacity = originalOpacity;
+    remove_element.style.opacity = originalOpacity;
 }
 
 
@@ -158,6 +165,8 @@ function remove(hash) {
     card = document.getElementById(hash);
     card.remove();
 }
+
+
 
 // below are JSON helper functions
 

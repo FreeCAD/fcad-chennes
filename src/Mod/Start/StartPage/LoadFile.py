@@ -21,6 +21,7 @@
 #***************************************************************************
 
 import FreeCADGui,sys,urllib
+
 # This script is called from StartPage.py with the variable "arg" set to some quoted URL
 filename=urllib.parse.unquote(arg)
 FreeCADGui.loadFile(filename)

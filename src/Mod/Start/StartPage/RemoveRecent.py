@@ -53,7 +53,7 @@ for recent in recentFiles:
 pinnedFilesGroup = FreeCAD.ParamGet("User parameter:BaseApp/Preferences/PinnedFiles")
 pinnedFilesEntries = pinnedFilesGroup.GetStrings()
 
-# Create a list of all the files we are keeping, and remove all of the old MRU entries so
+# Create a list of all the files we are keeping, and remove all of the old pin entries so
 # they can be renumbered
 pinnedFiles = []
 for entry in pinnedFilesEntries:
@@ -62,11 +62,8 @@ for entry in pinnedFilesEntries:
     if pinned != filename:
         pinnedFiles.append(pinned)
 
-
-# Recreate the whole list so the numbering stays consistent, but don't use Clear(),
-# which would cause the Start page to be re-rendered because it's watching that group.
 counter = 0
 for pinned in pinnedFiles:
-    parameterName = "MRU" + str(counter)
+    parameterName = "PIN" + str(counter)
     pinnedFilesGroup.SetString(parameterName, pinned)
     counter += 1
