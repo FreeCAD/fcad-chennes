@@ -94,6 +94,8 @@ ul.icons {
     margin: 10px;
     box-shadow: SHADOW 0 0px 6px;
     word-wrap: break-word;
+    overflow: hidden;
+    position: relative;
 }
 .icon h4 {
     margin: 3px 0;
@@ -116,6 +118,33 @@ a .caption, a .caption:link, a .caption:visited {
 
 .caption p {
     font-weight: normal;
+}
+img.pincard {
+    width: 12px;
+    height: 12px;
+    position: absolute;
+    top: 3px;
+    right: 20px;
+    margin: 0px;
+    padding: 0px;
+}
+img.pinactivecard {
+    width: 12px;
+    height: 12px;
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    margin: 0px;
+    padding: 0px;
+}
+img.removecard {
+    width: 12px;
+    height: 12px;
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    margin: 0px;
+    padding: 0px;
 }
 
 .docbox a:hover {

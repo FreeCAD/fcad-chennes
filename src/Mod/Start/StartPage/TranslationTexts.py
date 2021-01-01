@@ -79,3 +79,6 @@ T_EXTERNALLINKS = translate("StartPage", "To open any of the links above in your
 T_CREATIONDATE = translate("StartPage", "Creation date")
 T_LASTMODIFIED = translate("StartPage", "Last modification")
 T_NOTES = translate("StartPage", "Notes")
+T_PIN_TEXT = translate("StartPage", "Pin to recent files")
+T_UNPIN_TEXT = translate("StartPage", "Unpin from recent files")
+T_REMOVE_TEXT = translate("StartPage", "Remove from recent files")

@@ -6,15 +6,19 @@ SET(StartPage_Scripts
 )
 
 SET(StartPage_PythonResources
-    LoadMRU.py
-    LoadExample.py
-    LoadNew.py
-    LoadCustom.py
-    StartPage.css
-    StartPage.js
-    StartPage.html
     EnableDownload.py
+    LoadCustom.py
+    LoadExample.py
+    LoadFile.py
+    LoadMRU.py
+    LoadNew.py
     OpenSettings.py
+    PinRecent.py
+    RemoveRecent.py
+    StartPage.css
+    StartPage.html
+    StartPage.js
+    UnpinRecent.py
 )
 
 SET(StartPage_ImageResources
@@ -24,7 +28,10 @@ SET(StartPage_ImageResources
     images/manual.png
     images/freecad.png
     images/installed.png
+    images/remove.svg
     images/new_file_thumbnail.svg
+    images/pin.svg
+    images/pin_active.svg
     images/settings.png
 )
 

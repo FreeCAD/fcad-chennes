@@ -28,6 +28,7 @@ import six
 import sys,os,FreeCAD,FreeCADGui,tempfile,time,zipfile,urllib,re
 from . import TranslationTexts
 from PySide import QtCore,QtGui
+import hashlib
 
 FreeCADGui.addLanguagePath(":/translations")
 FreeCADGui.updateLocale()
@@ -256,6 +257,56 @@ def buildCard(filename,method,arg=None):
     return result
 
 
+def buildRemovableCard(filename,pinned):
+
+    "Builds an html <li> element representing a file that can be pinned and/or removed. Clicking on the element loads the file."
+
+    result = encode("")
+    quoted_filename = urllib.parse.quote(filename)
+    resources_dir = os.path.join(FreeCAD.getResourceDir(), "Mod", "Start", "StartPage")
+    pin_script = os.path.join(resources_dir, "PinRecent.py?arg="+quoted_filename)
+    unpin_script = os.path.join(resources_dir, "UnpinRecent.py?arg="+quoted_filename)
+    remove_script = os.path.join(resources_dir, "RemoveRecent.py?arg="+quoted_filename)
+    load_script = os.path.join(resources_dir, "LoadFile.py?arg="+quoted_filename)
+    pin_icon = '<img class="pincard" src="file:///'+os.path.join(resources_dir, "images/pin.svg")+'">'
+    pin_active_icon = '<img class="pinactivecard" src="file:///'+os.path.join(resources_dir, "images/pin_active.svg")+'">'
+    remove_icon = '<img class="removecard" src="file:///'+os.path.join(resources_dir, "images/remove.svg")+'">'
+
+    # We need to create an element id for our JS to access later: use a hash of the filename
+    filename_hash = hashlib.sha1(filename.encode('utf-8')).hexdigest()[:7]
+
+    if os.path.exists(filename) and isOpenableByFreeCAD(filename):
+        basename = encode(os.path.basename(filename))
+        finfo = getInfo(filename)
+        if finfo:
+            image = finfo[0]
+            size = finfo[1]
+            author = finfo[2]
+            infostring = encode(TranslationTexts.T_CREATIONDATE+": "+finfo[3]+"\n")
+            infostring += encode(TranslationTexts.T_LASTMODIFIED+": "+finfo[4])
+            if finfo[5]:
+                infostring += "\n\n" + encode(finfo[5])
+            if size:
+                result += '<a href="'+load_script+'" title="'+infostring+'">'
+                result += '<li class="icon" id="'+filename_hash+'">'
+                result += '<img src="file:///'+image+'">'
+                result += '<div class="caption">'
+                result += '<h4>'+encode(basename)+'</h4>'
+                result += '<p>'+encode(author)+'</p>'
+                result += '<p>'+size+'</p>'
+                result += '</div>'
+                
+                if pinned:
+                    result += '<a href="'+unpin_script+'" title="'+encode(TranslationTexts.T_UNPIN_TEXT)+'">'+pin_active_icon+'</a>'
+                else:
+                    result += '<a href="'+pin_script+'" title="'+encode(TranslationTexts.T_PIN_TEXT)+'">'+pin_icon+'</a>'
+                    result += '<a href="'+remove_script+'" title="'+encode(TranslationTexts.T_REMOVE_TEXT)+'">'+remove_icon+'</a>'
+
+                result += '</li>'
+                result += '</a>'
+    return result
+
+
 
 def handle():
 
@@ -378,9 +429,22 @@ def handle():
     SECTION_RECENTFILES += '</div>'
     SECTION_RECENTFILES += '</li>'
     SECTION_RECENTFILES += '</a>'
+    
+    # Pins first:
+    pinnedFilesGroup = FreeCAD.ParamGet("User parameter:BaseApp/Preferences/PinnedFiles")
+    pinnedFilesEntries = pinnedFilesGroup.GetStrings()
+    pinnedFiles = []
+    for entry in pinnedFilesEntries:
+        pin = pinnedFilesGroup.GetString(entry)
+        pinnedFiles.append(pin)
+        SECTION_RECENTFILES += encode(buildRemovableCard(pin,pinned=True))
+
+    # Any recent files that are not also pins:
     for i in range(rfcount):
         filename = rf.GetString("MRU%d" % (i))
-        SECTION_RECENTFILES += encode(buildCard(filename,method="LoadMRU.py?MRU=",arg=str(i)))
+        if filename not in pinnedFiles:
+            SECTION_RECENTFILES += encode(buildRemovableCard(filename,pinned=False))
+
     SECTION_RECENTFILES += '</ul>'
     HTML = HTML.replace("SECTION_RECENTFILES",SECTION_RECENTFILES)
 
