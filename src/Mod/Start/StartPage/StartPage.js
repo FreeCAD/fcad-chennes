@@ -111,6 +111,54 @@ function printForum(data) {
 }
 
 
+function mouseEnterCard(hash) {
+
+    pin_element = document.getElementById('pin_' + hash);
+    unpin_element = document.getElementById('unpin_' + hash);
+    remove_element = document.getElementById('remove_' + hash);
+
+    pin_element.style.opacity = 1.0;
+    unpin_element.style.opacity = 1.0;
+    remove_element.style.opacity = 1.0;
+
+}
+
+function mouseLeaveCard(hash) {
+
+    pin_element = document.getElementById('pin_' + hash);
+    unpin_element = document.getElementById('unpin_' + hash);
+    remove_element = document.getElementById('remove_' + hash);
+
+    pin_element.style.opacity = 0.05;
+    unpin_element.style.opacity = 0.05;
+    remove_element.style.opacity = 0.05;
+
+}
+
+
+function pin(hash) {
+    pin_element = document.getElementById('pin_' + hash);
+    unpin_element = document.getElementById('unpin_' + hash);
+
+    pin_element.style.visibility = "hidden";
+    unpin_element.style.visibility = "visible";
+}
+
+
+function unpin(hash) {
+    pin_element = document.getElementById('pin_' + hash);
+    unpin_element = document.getElementById('unpin_' + hash);
+
+    pin_element.style.visibility = "visible";
+    unpin_element.style.visibility = "hidden";
+}
+
+
+function remove(hash) {
+    card = document.getElementById(hash);
+    card.remove();
+}
+
 // below are JSON helper functions
 
 

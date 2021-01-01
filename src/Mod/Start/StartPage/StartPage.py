@@ -264,16 +264,24 @@ def buildRemovableCard(filename,pinned):
     result = encode("")
     quoted_filename = urllib.parse.quote(filename)
     resources_dir = os.path.join(FreeCAD.getResourceDir(), "Mod", "Start", "StartPage")
-    pin_script = os.path.join(resources_dir, "PinRecent.py?arg="+quoted_filename)
-    unpin_script = os.path.join(resources_dir, "UnpinRecent.py?arg="+quoted_filename)
-    remove_script = os.path.join(resources_dir, "RemoveRecent.py?arg="+quoted_filename)
-    load_script = os.path.join(resources_dir, "LoadFile.py?arg="+quoted_filename)
+
+    # The python functions handle the FreeCAD side of things, updating the stored user parameters
+    pin_python = os.path.join(resources_dir, "PinRecent.py?arg="+quoted_filename)
+    unpin_python = os.path.join(resources_dir, "UnpinRecent.py?arg="+quoted_filename)
+    remove_python = os.path.join(resources_dir, "RemoveRecent.py?arg="+quoted_filename)
+
+    # The JavaScript just deals with the display of the page, toggling between the pinned and unpinned states
+    # or removing the element. This is much more responsive than waiting for the Python to do its thing.
+    filename_hash = hashlib.sha1(filename.encode('utf-8')).hexdigest()[:7]
+    pin_js = "pin('"+filename_hash+"');";
+    unpin_js = "unpin('"+filename_hash+"');";
+    remove_js = "remove('"+filename_hash+"');";
+
     pin_icon = '<img class="pincard" src="file:///'+os.path.join(resources_dir, "images/pin.svg")+'">'
     pin_active_icon = '<img class="pinactivecard" src="file:///'+os.path.join(resources_dir, "images/pin_active.svg")+'">'
     remove_icon = '<img class="removecard" src="file:///'+os.path.join(resources_dir, "images/remove.svg")+'">'
-
-    # We need to create an element id for our JS to access later: use a hash of the filename
-    filename_hash = hashlib.sha1(filename.encode('utf-8')).hexdigest()[:7]
+    
+    load_script = os.path.join(resources_dir, "LoadFile.py?arg="+quoted_filename)
 
     if os.path.exists(filename) and isOpenableByFreeCAD(filename):
         basename = encode(os.path.basename(filename))
@@ -287,23 +295,27 @@ def buildRemovableCard(filename,pinned):
             if finfo[5]:
                 infostring += "\n\n" + encode(finfo[5])
             if size:
+
                 result += '<a href="'+load_script+'" title="'+infostring+'">'
-                result += '<li class="icon" id="'+filename_hash+'">'
+                result += '<li class="icon" id="'+filename_hash+'" onmouseenter="mouseEnterCard(\''+filename_hash+'\')" onmouseleave="mouseLeaveCard(\''+filename_hash+'\')">'
                 result += '<img src="file:///'+image+'">'
                 result += '<div class="caption">'
                 result += '<h4>'+encode(basename)+'</h4>'
                 result += '<p>'+encode(author)+'</p>'
                 result += '<p>'+size+'</p>'
                 result += '</div>'
-                
-                if pinned:
-                    result += '<a href="'+unpin_script+'" title="'+encode(TranslationTexts.T_UNPIN_TEXT)+'">'+pin_active_icon+'</a>'
-                else:
-                    result += '<a href="'+pin_script+'" title="'+encode(TranslationTexts.T_PIN_TEXT)+'">'+pin_icon+'</a>'
-                    result += '<a href="'+remove_script+'" title="'+encode(TranslationTexts.T_REMOVE_TEXT)+'">'+remove_icon+'</a>'
+
+                result += '<a href="'+unpin_python+'" onclick="'+unpin_js+'" id="unpin_'+filename_hash+'" title="'+encode(TranslationTexts.T_UNPIN_TEXT)+'" style="opacity:0.05;">'+pin_active_icon+'</a>'              
+                result += '<a href="'+pin_python+'" onclick="'+pin_js+'" id="pin_'+filename_hash+'" title="'+encode(TranslationTexts.T_PIN_TEXT)+'" style="opacity:0.05;">'+pin_icon+'</a>'
+                result += '<a href="'+remove_python+'" onclick="'+remove_js+'" id="remove_'+filename_hash+'" title="'+encode(TranslationTexts.T_REMOVE_TEXT)+'" style="opacity:0.05;">'+remove_icon+'</a>'
 
                 result += '</li>'
                 result += '</a>'
+                if pinned:
+                    result += '<script>'+pin_js+'</script>'
+                else:
+                    result += '<script>'+unpin_js+'</script>'
+
     return result
 
 
