@@ -236,7 +236,7 @@ def buildCard(filename,method,arg=None):
             arg = basename
         finfo = getInfo(filename)
         if finfo:
-            image = finfo[0]
+            image = finfo[0].replace('\\','/')
             size = finfo[1]
             author = finfo[2]
             infostring = encode(TranslationTexts.T_CREATIONDATE+": "+finfo[3]+"\n")
@@ -244,16 +244,16 @@ def buildCard(filename,method,arg=None):
             if finfo[5]:
                 infostring += "\n\n" + encode(finfo[5])
             if size:
-                result += '<a href="'+method+arg+'" title="'+infostring+'">'
                 result += '<li class="icon">'
-                result += '<img src="file:///'+image+'">'
+                result += '<a href="'+method+arg+'" title="'+infostring+'">'
+                result += '<img alt="" src="file:///'+image+'">'
                 result += '<div class="caption">'
                 result += '<h4>'+encode(basename)+'</h4>'
                 result += '<p>'+encode(author)+'</p>'
                 result += '<p>'+size+'</p>'
                 result += '</div>'
-                result += '</li>'
                 result += '</a>'
+                result += '</li>'
     return result
 
 
@@ -266,9 +266,9 @@ def buildRemovableCard(filename,pinned):
     resources_dir = os.path.join(FreeCAD.getResourceDir(), "Mod", "Start", "StartPage")
 
     # The python functions handle the FreeCAD side of things, updating the stored user parameters
-    pin_python = os.path.join(resources_dir, "PinRecent.py?arg="+quoted_filename)
-    unpin_python = os.path.join(resources_dir, "UnpinRecent.py?arg="+quoted_filename)
-    remove_python = os.path.join(resources_dir, "RemoveRecent.py?arg="+quoted_filename)
+    pin_python = os.path.join(resources_dir, "PinRecent.py?arg="+quoted_filename).replace('\\','/')
+    unpin_python = os.path.join(resources_dir, "UnpinRecent.py?arg="+quoted_filename).replace('\\','/')
+    remove_python = os.path.join(resources_dir, "RemoveRecent.py?arg="+quoted_filename).replace('\\','/')
 
     # The JavaScript deals with the display of the page, toggling between the pinned and unpinned states
     # or removing the element.
@@ -277,17 +277,17 @@ def buildRemovableCard(filename,pinned):
     unpin_js = "unpin('"+card_id+"');";
     remove_js = "remove('"+card_id+"');";
 
-    pin_icon_unpinned = '<img class="pincard" src="file:///'+os.path.join(resources_dir, "images/pin.svg")+'">'
-    pin_icon_pinned = '<img class="pincard" src="file:///'+os.path.join(resources_dir, "images/pin_active.svg")+'">'
-    remove_icon = '<img class="removecard" src="file:///'+os.path.join(resources_dir, "images/remove.svg")+'">'
+    pin_icon_unpinned = '<img alt="pin" class="pincard" src="file:///'+os.path.join(resources_dir, "images/pin.svg").replace('\\','/')+'">'
+    pin_icon_pinned = '<img alt="unpin" class="pincard" src="file:///'+os.path.join(resources_dir, "images/pin_active.svg").replace('\\','/')+'">'
+    remove_icon = '<img alt="remove" class="removecard" src="file:///'+os.path.join(resources_dir, "images/remove.svg").replace('\\','/')+'">'
     
-    load_script = os.path.join(resources_dir, "LoadFile.py?arg="+quoted_filename)
+    load_script = os.path.join(resources_dir, "LoadFile.py?arg="+quoted_filename).replace('\\','/')
 
     if os.path.exists(filename) and isOpenableByFreeCAD(filename):
         basename = encode(os.path.basename(filename))
         finfo = getInfo(filename)
         if finfo:
-            image = finfo[0]
+            image = finfo[0].replace('\\','/')
             size = finfo[1]
             author = finfo[2]
             infostring = encode(TranslationTexts.T_CREATIONDATE+": "+finfo[3]+"\n")
@@ -297,23 +297,23 @@ def buildRemovableCard(filename,pinned):
 
             if size:
 
+                result += '<li class="icon" id="card_'+card_id+'" onmouseenter="mouseEnterCard(\''+card_id+'\')" onmouseleave="mouseLeaveCard(\''+card_id+'\')">'
                 result += '<a href="'+load_script+'" title="'+infostring+'">'
-                result += '<li class="icon" id="'+card_id+'" onmouseenter="mouseEnterCard(\''+card_id+'\')" onmouseleave="mouseLeaveCard(\''+card_id+'\')">'
-                result += '<img src="file:///'+image+'">'
+                result += '<img alt="file image" src="file:///'+image+'">'
                 result += '<div class="caption">'
                 result += '<h4>'+encode(basename)+'</h4>'
                 result += '<p>'+encode(author)+'</p>'
                 result += '<p>'+size+'</p>'
                 result += '</div>'
+                result += '</a>'
 
                 # Insert all three buttons: the JavaScript will turn off either the pinned or unpinned version, as needed
                 button_template = '<a href="{}" onclick="{}" id="{}" title="{}" class="dynamicicon">{}</a>'
                 result += button_template.format(unpin_python,unpin_js,"unpin_"+card_id,encode(TranslationTexts.T_UNPIN_TEXT),pin_icon_pinned)
                 result += button_template.format(pin_python,pin_js,"pin_"+card_id,encode(TranslationTexts.T_PIN_TEXT),pin_icon_unpinned)
                 result += button_template.format(remove_python,remove_js,"remove_"+card_id,encode(TranslationTexts.T_REMOVE_TEXT),remove_icon)
-
+                
                 result += '</li>'
-                result += '</a>'
 
                 # Update the visual state of the buttons in the JavaScript
                 if pinned:
@@ -435,17 +435,17 @@ def handle():
     rfcount = rf.GetInt("RecentFiles",0)
     SECTION_RECENTFILES = encode("<h2>"+TranslationTexts.T_RECENTFILES+"</h2>")
     SECTION_RECENTFILES += "<ul>"
-    SECTION_RECENTFILES += '<a href="LoadNew.py" title="'+encode(TranslationTexts.T_CREATENEW)+'">'
     SECTION_RECENTFILES += '<li class="icon">'
+    SECTION_RECENTFILES += '<a href="LoadNew.py" title="'+encode(TranslationTexts.T_CREATENEW)+'">'
     if FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Mod/Start").GetBool("NewFileGradient",False):
-        SECTION_RECENTFILES += '<img src="file:///'+encode(iconbank["createimg"])+'">'
+        SECTION_RECENTFILES += '<img alt="'+encode(TranslationTexts.T_CREATENEW)+'" src="file:///'+encode(iconbank["createimg"])+'">'
     else:
-        SECTION_RECENTFILES += '<img src="file:///'+os.path.join(resources_dir, "images/new_file_thumbnail.svg")+'">'
+        SECTION_RECENTFILES += '<img alt="'+encode(TranslationTexts.T_CREATENEW)+'" src="file:///'+os.path.join(resources_dir, "images/new_file_thumbnail.svg").replace('\\','/')+'">'
     SECTION_RECENTFILES += '<div class="caption">'
     SECTION_RECENTFILES += '<h4>'+encode(TranslationTexts.T_CREATENEW)+'</h4>'
     SECTION_RECENTFILES += '</div>'
-    SECTION_RECENTFILES += '</li>'
     SECTION_RECENTFILES += '</a>'
+    SECTION_RECENTFILES += '</li>'
     
     # Pins first:
     pinnedFilesGroup = FreeCAD.ParamGet("User parameter:BaseApp/Preferences/PinnedFiles")
@@ -500,16 +500,17 @@ def handle():
             dn += 1
     HTML = HTML.replace("SECTION_CUSTOM",SECTION_CUSTOM)
 
-    # build IMAGE_SRC paths
-
-    HTML = HTML.replace("IMAGE_SRC_USERHUB",'file:///'+os.path.join(resources_dir, 'images/userhub.png'))
-    HTML = HTML.replace("IMAGE_SRC_POWERHUB",'file:///'+os.path.join(resources_dir, 'images/poweruserhub.png'))
-    HTML = HTML.replace("IMAGE_SRC_DEVHUB",'file:///'+os.path.join(resources_dir, 'images/developerhub.png'))
-    HTML = HTML.replace("IMAGE_SRC_MANUAL",'file:///'+os.path.join(resources_dir, 'images/manual.png'))
-    HTML = HTML.replace("IMAGE_SRC_SETTINGS",'file:///'+os.path.join(resources_dir, 'images/settings.png'))
-    imagepath= 'file:///'+os.path.join(resources_dir, 'images/installed.png')
-    imagepath = imagepath.replace('\\','/')  # replace Windows backslash with slash to make the path javascript compatible
-    HTML = HTML.replace("IMAGE_SRC_INSTALLED",imagepath)
+    # build IMAGE_SRC paths, replacing all Windows backslash path separators with / for HTML and JS compatibility, per the W3C validator
+    image_source_replacements = [["IMAGE_SRC_USERHUB",'file:///'+os.path.join(resources_dir, 'images/userhub.png')],
+                                 ["IMAGE_SRC_POWERHUB",'file:///'+os.path.join(resources_dir, 'images/poweruserhub.png')],
+                                 ["IMAGE_SRC_DEVHUB",'file:///'+os.path.join(resources_dir, 'images/developerhub.png')],
+                                 ["IMAGE_SRC_MANUAL",'file:///'+os.path.join(resources_dir, 'images/manual.png')],
+                                 ["IMAGE_SRC_SETTINGS",'file:///'+os.path.join(resources_dir, 'images/settings.png')],
+                                 ["IMAGE_SRC_INSTALLED",'file:///'+os.path.join(resources_dir, 'images/installed.png')]]
+    for replacement_pair in image_source_replacements:
+        find_tag = replacement_pair[0]
+        replace_with=replacement_pair[1].replace('\\','/')
+        HTML = HTML.replace(find_tag,replace_with)
 
     # build UL_WORKBENCHES
 
@@ -570,8 +571,8 @@ def handle():
                     img = os.path.join(resources_dir,"images/freecad.png")
             iconbank[wb] = img
         UL_WORKBENCHES += '<li>'
-        UL_WORKBENCHES += '<img src="file:///'+iconbank[wb]+'">&nbsp;'
-        UL_WORKBENCHES += '<a href="https://www.freecadweb.org/wiki/'+wn+'_Workbench">'+wn.replace("ReverseEngineering","ReverseEng")+'</a>'
+        UL_WORKBENCHES += '<img alt="workbench" src="file:///'+iconbank[wb].replace('\\','/')+'">&nbsp;'
+        UL_WORKBENCHES += '<a href="https://www.freecadweb.org/wiki/'+wn+'_Workbench">'+wn.replace("ReverseEngineering","ReverseEng").replace('\\','/')+'</a>'
         UL_WORKBENCHES += '</li>'
     UL_WORKBENCHES += '</ul>'
     HTML = HTML.replace("UL_WORKBENCHES",encode(UL_WORKBENCHES))
@@ -624,6 +625,7 @@ def handle():
     HTML = HTML.replace("TEXTCOLOR",TEXTCOLOR)
     HTML = HTML.replace("BGTCOLOR",BGTCOLOR)
     HTML = HTML.replace("BACKGROUND",BACKGROUND)
+    HTML = HTML.replace("SHADOW",SHADOW)
     HTML = HTML.replace("FONTFAMILY",FONTFAMILY)
     HTML = HTML.replace("FONTSIZE",str(FONTSIZE)+"px")
 

@@ -162,7 +162,7 @@ function unpin(hash) {
 
 
 function remove(hash) {
-    card = document.getElementById(hash);
+    card = document.getElementById('card_' + hash);
     card.remove();
 }
 
