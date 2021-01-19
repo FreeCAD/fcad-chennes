@@ -1221,6 +1221,8 @@ SET(Selection_SRCS
     SelectionFilter.cpp
     SelectionFilter.y
     SelectionFilter.l
+    SelectionModeManager.h
+    SelectionModeManager.cpp
 )
 SOURCE_GROUP("Selection" FILES ${Selection_SRCS})
 

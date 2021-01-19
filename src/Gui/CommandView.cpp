@@ -73,6 +73,7 @@
 #include "Tools.h"
 #include "Utilities.h"
 #include "NavigationStyle.h"
+#include "SelectionModeManager.h"
 
 #include <Base/Console.h>
 #include <Base/Tools2D.h>
@@ -2848,6 +2849,33 @@ void StdBoxElementSelection::activated(int iMsg)
     }
 }
 
+//===========================================================================
+// Std_ActivateSelectionModeManager
+//===========================================================================
+DEF_3DV_CMD(StdActivateSelectionModeManager)
+
+StdActivateSelectionModeManager::StdActivateSelectionModeManager()
+    : Command("Std_ActivateSelectionModeManager")
+{
+    sGroup = QT_TR_NOOP("Standard-View");
+    sMenuText = QT_TR_NOOP("Enter/leave selection mode");
+    sToolTipText = QT_TR_NOOP("Enter or leave selection mode");
+    sWhatsThis = "Std_ActivateSelectionManagerMode";
+    sStatusTip = QT_TR_NOOP("Enter or leave selection mode");
+    //sPixmap = "";
+    sAccel = "Shift+S";
+    eType = AlterSelection;
+}
+
+void StdActivateSelectionModeManager::activated(int iMsg)
+{
+    Q_UNUSED(iMsg);
+    View3DInventor* view = qobject_cast<View3DInventor*>(getMainWindow()->activeWindow());
+    if (view) {
+        SelectionModeManager::Instance()->ToggleSelectionMode();
+    }
+}
+
 
 //===========================================================================
 // Std_TreeSelection
@@ -3632,6 +3660,7 @@ void CreateViewStdCommands(void)
     rcCmdMgr.addCommand(new StdViewZoomIn());
     rcCmdMgr.addCommand(new StdViewZoomOut());
     rcCmdMgr.addCommand(new StdViewBoxZoom());
+    rcCmdMgr.addCommand(new StdActivateSelectionModeManager());
     rcCmdMgr.addCommand(new StdBoxSelection());
     rcCmdMgr.addCommand(new StdBoxElementSelection());
     rcCmdMgr.addCommand(new StdCmdTreeExpand());
