@@ -2481,10 +2481,11 @@ private:
                     std::stringstream str;
                     Base::TimeInfo ti = fi.lastModified();
                     time_t s =ti.getSeconds();
-                    struct tm * timeinfo = localtime(& s);
+                    struct tm timeinfo;
+                    localtime_s(&timeinfo, &s);
                     char buffer[100];
 
-                    strftime(buffer,sizeof(buffer),saveBackupDateFormat.c_str(),timeinfo);
+                    strftime(buffer,sizeof(buffer),saveBackupDateFormat.c_str(),&timeinfo);
                     str << bn << buffer ;
 
                     fn = str.str();

@@ -534,7 +534,7 @@ namespace Base {
             void NotifyLog    (const char *sMsg);
 
             /// Delivers a time/date string
-            const char* Time(void);
+            std::string Time(void);
             /// Attaches an Observer to FCConsole
             void AttachObserver(ILogger *pcObserver);
             /// Detaches an Observer from FCConsole

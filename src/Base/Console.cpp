@@ -342,17 +342,16 @@ void ConsoleSingleton::Log( const char *pMsg, ... )
 /** Delivers the time/date
  *  This method gives you a string with the actual time/date. You can
  *  use that for Log() calls to make timestamps.
- *  @return Const string with the date/time
+ *  @return New string with the date/time
  */
-const char* ConsoleSingleton::Time(void)
+std::string ConsoleSingleton::Time(void)
 {
-    struct tm *newtime;
-    time_t aclock;
-    time( &aclock );                 // Get time in seconds
-    newtime = localtime( &aclock );  // Convert time to struct tm form
-    char* st = asctime( newtime );
-    st[24] = 0;
-    return st;
+    struct tm newtime;
+    time_t aclock = std::time(nullptr);
+    localtime_s(&newtime, &aclock);
+    char st[25];
+    std::strftime(st, sizeof(st), "%c", &newtime);
+    return std::string(st);
 }
 
 
