@@ -245,9 +245,11 @@ WebView::WebView(QWidget *parent)
 #else
     QRect mainScreenSize = QApplication::desktop()->screenGeometry();
 #endif
+#ifdef QTWEBKIT
     if (mainScreenSize.width() > 1920){
         setTextSizeMultiplier (mainScreenSize.width()/1920.0);
     }
+#endif
 }
 
 #ifdef QTWEBENGINE
