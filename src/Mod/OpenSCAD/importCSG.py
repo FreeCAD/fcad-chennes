@@ -1324,32 +1324,39 @@ def p_projection_action(p) :
     if printverbose: print('Projection')
 
     doc.recompute()
-    bbox = p[6][0].Shape.BoundBox
-    for shape in p[6]:
-        bbox.add(shape.Shape.BoundBox)
-    print (bbox)
-    plane = doc.addObject("Part::Plane","xy_plane_used_for_projection")
-    plane.Length = bbox.XLength
-    plane.Width = bbox.YLength
-    plane.Placement = FreeCAD.Placement(FreeCAD.Vector(\
-                     bbox.XMin,bbox.YMin,0),FreeCAD.Rotation())
-    if gui:
-        plane.ViewObject.hide()
+    if (len(p[6]) > 1):
+        fused_object = [fuse(p[6],"projection_cut_implicit_group")]
+    else:
+        fused_object = p[6]
 
     if p[3]['cut'] == 'true' :
         obj = doc.addObject('Part::MultiCommon','projection_cut')
-        if (len(p[6]) > 1):
-            subobj = [fuse(p[6],"projection_cut_implicit_group")]
-        else:
-            subobj = p[6]
-        obj.Shapes = [plane] + subobj
+        
+        plane = doc.addObject("Part::Plane","xy_plane_used_for_projection")
+
+        bbox = fused_object[0].Shape.BoundBox
+        plane.Length = bbox.XLength
+        plane.Width = bbox.YLength
+        plane.Placement = FreeCAD.Placement(FreeCAD.Vector(\
+                            bbox.XMin,bbox.YMin,0),FreeCAD.Rotation())
         if gui:
-            subobj[0].ViewObject.hide()
-        p[0] = [obj]
+            plane.ViewObject.hide()
+            obj.Shapes = [plane] + fused_object
+            if gui:
+                fused_object[0].ViewObject.hide()
+            p[0] = [obj]
     else: # cut == 'false' => true projection
-        if gui and not FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Mod/OpenSCAD").\
-                GetBool('usePlaceholderForUnsupported'):
-            from PySide import QtGui
-            QtGui.QMessageBox.critical(None, translate('OpenSCAD',"Unsupported Function") + " : " + p[1],translate('OpenSCAD',"Press OK"))
-        else:
-            p[0] = [placeholder(p[1],p[6],p[3])]
+        
+        new_object = doc.addObject("Part::FeaturePython","projection")
+        Projection(new_object,fused_object[0])
+        
+        if gui:
+            if FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Mod/OpenSCAD").\
+                GetBool('useViewProviderTree'):
+                from OpenSCADFeatures import ViewProviderTree
+                ViewProviderTree(new_object.ViewObject)
+            else:
+                new_object.ViewObject.Proxy = 0
+            fused_object[0].ViewObject.hide()
+
+        p[0] = [new_object]

@@ -584,6 +584,44 @@ class CGALFeature:
         else:
             raise ValueError
 
+class Projection:
+    def __init__(self,obj,child=None):
+        obj.addProperty("App::PropertyLink","Base","Base",
+                        "The base object that must be transformed")
+
+        obj.Base = child
+        obj.Proxy = self
+
+    def execute(self,fp):
+        self.createGeometry(fp)
+
+    def onChanged(self,fp,prop):
+        pass
+
+    def createGeometry(self,fp):
+        if fp.Base:
+            import FreeCAD, Part
+
+            bbox = fp.Base.Shape.BoundBox
+
+            view_dir = FreeCAD.Vector(0,0,-1)
+            up_dir = FreeCAD.Vector(0,1,0)
+            view_pos = FreeCAD.Vector(0,0,bbox.ZMax+1)
+
+            reflect_lines = fp.Base.Shape.reflectLines(ViewDir=view_dir, ViewPos=view_pos, UpDir=up_dir)
+            if reflect_lines and not reflect_lines.isNull():
+                print ("Created the reflectLines")
+
+                # Turn them into a face:
+                #fp.Shape = Part.makeFace(reflect_lines, "Part::FaceMakerBullseye")
+
+                fp.Shape = reflect_lines
+
+
+
+            else:
+                raise ValueError
+
 def makeSurfaceVolume(filename):
     import FreeCAD,Part,sys
     with open(filename) as f1:
