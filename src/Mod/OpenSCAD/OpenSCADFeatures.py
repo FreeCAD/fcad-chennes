@@ -612,12 +612,11 @@ class Projection:
             if reflect_lines and not reflect_lines.isNull():
                 print ("Created the reflectLines")
 
-                # Turn them into a face:
-                #fp.Shape = Part.makeFace(reflect_lines, "Part::FaceMakerBullseye")
+                sorted_edges = Part.sortEdges(reflect_lines.Edges)
+                wires = [Part.Wire(edges) for edges in sorted_edges]
 
-                fp.Shape = reflect_lines
-
-
+                #fp.Shape = Part.makeFace(wires, "Part::FaceMakerBullseye")
+                fp.Shape = Part.makeCompound (wires)
 
             else:
                 raise ValueError
