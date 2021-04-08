@@ -258,6 +258,7 @@ SET(FreeCADBase_CPP_SRCS
     Matrix.cpp
     MatrixPyImp.cpp
     MemDebug.cpp
+    MetadataReader.cpp
     Parameter.xsd
     Parameter.cpp
     ParameterPy.cpp
@@ -274,6 +275,7 @@ SET(FreeCADBase_CPP_SRCS
     Stream.cpp
     Swap.cpp
     ${SWIG_SRCS}
+    ThemeManager.cpp
     TimeInfo.cpp
     Tools.cpp
     Tools2D.cpp
@@ -329,6 +331,7 @@ SET(FreeCADBase_HPP_SRCS
     Interpreter.h
     Matrix.h
     MemDebug.h
+    MetadataReader.h
     Observer.h
     Parameter.h
     Persistence.h
@@ -341,6 +344,7 @@ SET(FreeCADBase_HPP_SRCS
     Stream.h
     Swap.h
     ${SWIG_HEADERS}
+    ThemeManager.h
     TimeInfo.h
     Tools.h
     Tools2D.h
