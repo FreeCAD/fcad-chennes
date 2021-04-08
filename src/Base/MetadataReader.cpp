@@ -267,6 +267,11 @@ Meta::Dependency::Dependency(XERCES_CPP_NAMESPACE::DOMElement* e)
     package = transcodeToString(e->getTextContent());
 }
 
+bool Base::Meta::Dependency::matchesDependency(const std::string version) const
+{
+    return false;
+}
+
 Meta::GenericMetadata::GenericMetadata(XERCES_CPP_NAMESPACE::DOMElement* e)
 {
     contents = transcodeToString(e->getTextContent());

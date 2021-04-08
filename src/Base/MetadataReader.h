@@ -35,16 +35,27 @@ namespace Base {
 
     namespace Meta {
 
+        /**
+         * \struct Contact
+         * \brief A person or company representing a point of contact for the package (either author or maintainer).
+         */
         struct Contact {
-            Contact(XERCES_CPP_NAMESPACE::DOMElement*e);
-            std::string name;
-            std::string email;
+            explicit Contact(XERCES_CPP_NAMESPACE::DOMElement* e);
+            std::string name; //< Contact name - required
+            std::string email; //< Contact email - may be optional
         };
 
+        /**
+         * \struct License
+         * \brief A license that covers some or all of this package.
+         * 
+         * Many licenses also require the inclusion of the complete license text, specified in this struct
+         * using the "file" member.
+         */
         struct License {
-            License(XERCES_CPP_NAMESPACE::DOMElement* e);
-            std::string name;
-            boost::filesystem::path file;
+            explicit License(XERCES_CPP_NAMESPACE::DOMElement* e);
+            std::string name; //< Short name of license, e.g. "LGPL2", "MIT", "Mozilla Public License", etc.
+            boost::filesystem::path file; //< Optional path to the license file, relative to the XML file's location
         };
 
         enum class UrlType {
@@ -53,15 +64,23 @@ namespace Base {
             bugtracker
         };
 
+        /**
+         * \struct Url
+         * \brief A URL, including type information (e.g. website, repository, or bugtracker, in package.xml v3)
+         */
         struct Url {
-            Url(XERCES_CPP_NAMESPACE::DOMElement* e);
-            std::string location;
-            UrlType type;
+            explicit Url(XERCES_CPP_NAMESPACE::DOMElement* e);
+            std::string location; //< The actual URL, including protocol
+            UrlType type; //< What kind of URL this is
         };
 
+        /**
+         * \struct Dependency
+         * \brief Another package that this package depends on, conflicts with, or replaces
+         */
         struct Dependency {
-            Dependency(XERCES_CPP_NAMESPACE::DOMElement* e);
-            std::string package; //< Required
+            explicit Dependency(XERCES_CPP_NAMESPACE::DOMElement* e);
+            std::string package; //< Required: must exactly match the contents of the "name" element in the referenced package's package.xml file.
             std::string version_lt; //< Optional: The dependency to the package is restricted to versions less than the stated version number.
             std::string version_lte; //< Optional: The dependency to the package is restricted to versions less or equal than the stated version number.
             std::string version_eq; //< Optional: The dependency to the package is restricted to a version equal than the stated version number.
@@ -89,9 +108,9 @@ namespace Base {
          * for convenient access by client code.
          */
         struct GenericMetadata {
-            GenericMetadata(XERCES_CPP_NAMESPACE::DOMElement* e);
-            std::string contents;
-            std::map<std::string,std::string> attributes;
+            explicit GenericMetadata(XERCES_CPP_NAMESPACE::DOMElement* e);
+            std::string contents; //< The contents of the tag
+            std::map<std::string,std::string> attributes; //< The XML attributes of the tag
         };
 
     }
@@ -133,19 +152,27 @@ namespace Base {
         
         ~Metadata();
 
-        // Required metadata: these functions always return valid data
-        std::string name() const;
-        std::string version() const;
-        std::string description() const;
-        std::vector<Meta::Contact> maintainer() const;
-        std::vector<Meta::License> license() const;
 
-        // Optional recognized metadata: these functions may return empty vectors
-        std::vector<Meta::Url> url() const;
-        std::vector<Meta::Contact> author() const;
-        std::vector<Meta::Dependency> depend() const;
-        std::vector<Meta::Dependency> conflict() const;
-        std::vector<Meta::Dependency> replace() const;
+        //////////////////////////////////////////////////////////////
+        // Required metadata
+        //////////////////////////////////////////////////////////////
+
+        std::string name() const; //< A short name for this package, often used as a menu entry.
+        std::string version() const; //< Human-readable version string -- typically in triplet format, e.g. "v1.2.3".
+        std::string description() const; //< Text-only description of the package. No markup.
+        std::vector<Meta::Contact> maintainer() const; //< Must be at least one, and must specify an email address.
+        std::vector<Meta::License> license() const; //< Must be at least one, and most licenses require including a license file.
+
+
+        //////////////////////////////////////////////////////////////
+        // Optional (recognized) metadata
+        //////////////////////////////////////////////////////////////
+
+        std::vector<Meta::Url> url() const; //< Any number of URLs may be specified (including zero).
+        std::vector<Meta::Contact> author() const; //< Any number of authors may be specified, and email addresses are optional.
+        std::vector<Meta::Dependency> depend() const; //< Zero or more packages this package requires prior to use.
+        std::vector<Meta::Dependency> conflict() const; //< Zero of more packages this package conflicts with.
+        std::vector<Meta::Dependency> replace() const; //< Zero or more packages this package is intended to replace.
 
         /**
          * Convenience accessor for unrecognized simple metadata.
@@ -170,7 +197,6 @@ namespace Base {
         std::vector<Meta::Contact> _maintainer;
         std::vector<Meta::License> _license;
 
-        // Optional recognized metadata: these functions may return empty vectors
         std::vector<Meta::Url> _url;
         std::vector<Meta::Contact> _author;
         std::vector<Meta::Dependency> _depend;
