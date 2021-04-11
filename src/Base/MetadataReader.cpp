@@ -6,7 +6,7 @@
  *   This library is free software; you can redistribute it and/or         *
  *   modify it under the terms of the GNU Library General Public           *
  *   License as published by the Free Software Foundation; either          *
- *   version 2 of the License, or (at your option) any later version.      *
+ *   version 2.1 of the License, or (at your option) any later version.    *
  *                                                                         *
  *   This library  is distributed in the hope that it will be useful,      *
  *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
@@ -14,7 +14,7 @@
  *   GNU Library General Public License for more details.                  *
  *                                                                         *
  *   You should have received a copy of the GNU Library General Public     *
- *   License along with this library; see the file COPYING.LIB. If not,    *
+ *   License along with this library; see the file LICENSE.html. If not,   *
  *   write to the Free Software Foundation, Inc., 59 Temple Place,         *
  *   Suite 330, Boston, MA  02111-1307, USA                                *
  *                                                                         *
@@ -39,6 +39,14 @@ namespace fs = boost::filesystem;
 XERCES_CPP_NAMESPACE_USE
 
 
+std::string transcodeToString(const XMLCh* xml)
+{
+    auto temp = XMLString::transcode(xml);
+    auto s = std::string(temp);
+    XMLString::release(&temp);
+    return s;
+}
+
 Metadata::Metadata(const boost::filesystem::path& metadataFile)
 {
     // Any exception thrown by the XML code propagates out and prevents object creation
@@ -59,26 +67,40 @@ Metadata::Metadata(const boost::filesystem::path& metadataFile)
     auto tempString = XMLString::transcode("package");
     auto rootTagName = _dom->getTagName();
     if (XMLString::compareString(rootTagName, tempString) != 0)
-        throw std::exception("package.xml must contain one, and only one, <package> element.");
+        throw std::runtime_error("package.xml must contain one, and only one, <package> element.");
     XMLString::release(&tempString);
 
     tempString = XMLString::transcode("format");
     auto formatString = _dom->getAttribute(tempString);
     if (XMLString::stringLen(formatString) == 0)
-        throw std::exception("<package> must contain the 'format' attribute");
+        throw std::runtime_error("<package> must contain the 'format' attribute");
     auto format = XMLString::parseInt(formatString);
     XMLString::release(&tempString);
     
     switch (format) {
     case 3:
-        parseVersion3();
+        parseVersion3(_dom);
         break;
     default:
         throw std::exception("pacakge.xml format version is not supported by this version of FreeCAD");
     }
 }
 
-Base::Metadata::~Metadata()
+Base::Metadata::Metadata(const DOMNode* domNode, int format)
+{
+    auto element = dynamic_cast<const DOMElement*>(domNode);
+    if (element) {
+        switch (format) {
+        case 3:
+            parseVersion3(element);
+            break;
+        default:
+            throw std::exception("Requested format version is not supported by this version of FreeCAD");
+        }
+    }
+}
+
+Metadata::~Metadata()
 {
     XMLPlatformUtils::Terminate();
 }
@@ -133,7 +155,22 @@ std::vector<Meta::Dependency> Metadata::replace() const
     return _replace;
 }
 
-std::vector<Meta::GenericMetadata> Metadata::operator[](const std::string tag) const
+std::vector<std::string> Metadata::tag() const
+{
+    return _tag;
+}
+
+boost::filesystem::path Metadata::icon() const
+{
+    return _icon;
+}
+
+std::multimap<std::string, Metadata> Metadata::content() const
+{
+    return _content;
+}
+
+std::vector<Meta::GenericMetadata> Metadata::operator[](const std::string &tag) const
 {
     return _genericMetadata;
 }
@@ -143,21 +180,13 @@ XERCES_CPP_NAMESPACE::DOMElement* Metadata::dom() const
     return _dom;
 }
 
-std::string transcodeToString(const XMLCh* xml)
+void Metadata::parseVersion3(const DOMNode *startNode)
 {
-    auto temp = XMLString::transcode(xml);
-    auto s = std::string(temp);
-    XMLString::release(&temp);
-    return s;
-}
-
-void Metadata::parseVersion3()
-{
-    auto children = _dom->getChildNodes();
+    auto children = startNode->getChildNodes();
 
     for (int i = 0; i < children->getLength(); ++i) {
         auto child = children->item(i);
-        auto element = dynamic_cast<DOMElement*>(child);
+        auto element = dynamic_cast<const DOMElement*>(child);
         if (!element)
             continue;
 
@@ -201,13 +230,35 @@ void Metadata::parseVersion3()
             _conflict.emplace_back(element);
         else if (tagString == "replace")
             _replace.emplace_back(element);
+        else if (tagString == "tag")
+            _tag.emplace_back(transcodeToString(element->getTextContent()));
+        else if (tagString == "file")
+            _file.emplace_back(transcodeToString(element->getTextContent()));
+        else if (tagString == "classname")
+            _classname = transcodeToString(element->getTextContent());
+        else if (tagString == "icon")
+            _icon = fs::path(transcodeToString(element->getTextContent()));
+        else if (tagString == "content")
+            parseContentNodeVersion3(element);
         else if (child->getChildNodes()->getLength() == 0)
             _genericMetadata.emplace_back(element);
         // else we don't recognize this tag, just ignore it, but leave it in the DOM tree
     }
 }
 
-Meta::Contact::Contact(XERCES_CPP_NAMESPACE::DOMElement* e)
+void Metadata::parseContentNodeVersion3(const DOMElement* contentNode)
+{
+    auto children = contentNode->getChildNodes();
+    for (int i = 0; i < children->getLength(); ++i) {
+        auto child = dynamic_cast<const DOMElement*>(children->item(i));
+        if (child) {
+            auto tag = transcodeToString(child->getTagName());
+            _content.insert(std::make_pair(tag, Metadata(child, 3)));
+        }
+    }
+}
+
+Meta::Contact::Contact(const XERCES_CPP_NAMESPACE::DOMElement* e)
 {
     auto emailXmlCh = XMLString::transcode("email");
     auto emailAttribute = e->getAttribute(emailXmlCh);
@@ -216,7 +267,7 @@ Meta::Contact::Contact(XERCES_CPP_NAMESPACE::DOMElement* e)
     email = transcodeToString(emailAttribute);
 }
 
-Meta::License::License(XERCES_CPP_NAMESPACE::DOMElement* e)
+Meta::License::License(const XERCES_CPP_NAMESPACE::DOMElement* e)
 {
     auto fileXmlCh = XMLString::transcode("file");
     auto fileAttribute = e->getAttribute(fileXmlCh);
@@ -227,7 +278,7 @@ Meta::License::License(XERCES_CPP_NAMESPACE::DOMElement* e)
     name = transcodeToString(e->getTextContent());
 }
 
-Meta::Url::Url(XERCES_CPP_NAMESPACE::DOMElement* e)
+Meta::Url::Url(const XERCES_CPP_NAMESPACE::DOMElement* e)
 {
     auto typeXmlCh = XMLString::transcode("type");
     auto typeAttribute = transcodeToString(e->getAttribute(typeXmlCh));
@@ -241,7 +292,7 @@ Meta::Url::Url(XERCES_CPP_NAMESPACE::DOMElement* e)
     location = transcodeToString(e->getTextContent());
 }
 
-Meta::Dependency::Dependency(XERCES_CPP_NAMESPACE::DOMElement* e)
+Meta::Dependency::Dependency(const XERCES_CPP_NAMESPACE::DOMElement* e)
 {
     auto ltXmlCh = XMLString::transcode("version_lt");
     auto lteXmlCh = XMLString::transcode("version_lte");
@@ -267,12 +318,12 @@ Meta::Dependency::Dependency(XERCES_CPP_NAMESPACE::DOMElement* e)
     package = transcodeToString(e->getTextContent());
 }
 
-bool Base::Meta::Dependency::matchesDependency(const std::string version) const
+bool Meta::Dependency::matchesDependency(const std::string &version) const
 {
     return false;
 }
 
-Meta::GenericMetadata::GenericMetadata(XERCES_CPP_NAMESPACE::DOMElement* e)
+Meta::GenericMetadata::GenericMetadata(const XERCES_CPP_NAMESPACE::DOMElement* e)
 {
     contents = transcodeToString(e->getTextContent());
     for (int i = 0; i < e->getAttributes()->getLength(); ++i) {
