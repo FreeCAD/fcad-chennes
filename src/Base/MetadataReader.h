@@ -6,7 +6,7 @@
  *   This library is free software; you can redistribute it and/or         *
  *   modify it under the terms of the GNU Library General Public           *
  *   License as published by the Free Software Foundation; either          *
- *   version 2 of the License, or (at your option) any later version.      *
+ *   version 2.1 of the License, or (at your option) any later version.    *
  *                                                                         *
  *   This library  is distributed in the hope that it will be useful,      *
  *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
@@ -14,7 +14,7 @@
  *   GNU Library General Public License for more details.                  *
  *                                                                         *
  *   You should have received a copy of the GNU Library General Public     *
- *   License along with this library; see the file COPYING.LIB. If not,    *
+ *   License along with this library; see the file LICENSE.html. If not,   *
  *   write to the Free Software Foundation, Inc., 59 Temple Place,         *
  *   Suite 330, Boston, MA  02111-1307, USA                                *
  *                                                                         *
@@ -40,7 +40,7 @@ namespace Base {
          * \brief A person or company representing a point of contact for the package (either author or maintainer).
          */
         struct Contact {
-            explicit Contact(XERCES_CPP_NAMESPACE::DOMElement* e);
+            explicit Contact(const XERCES_CPP_NAMESPACE::DOMElement* e);
             std::string name; //< Contact name - required
             std::string email; //< Contact email - may be optional
         };
@@ -53,7 +53,7 @@ namespace Base {
          * using the "file" member.
          */
         struct License {
-            explicit License(XERCES_CPP_NAMESPACE::DOMElement* e);
+            explicit License(const XERCES_CPP_NAMESPACE::DOMElement* e);
             std::string name; //< Short name of license, e.g. "LGPL2", "MIT", "Mozilla Public License", etc.
             boost::filesystem::path file; //< Optional path to the license file, relative to the XML file's location
         };
@@ -61,7 +61,9 @@ namespace Base {
         enum class UrlType {
             website,
             repository,
-            bugtracker
+            bugtracker,
+            readme,
+            documentation
         };
 
         /**
@@ -69,7 +71,7 @@ namespace Base {
          * \brief A URL, including type information (e.g. website, repository, or bugtracker, in package.xml v3)
          */
         struct Url {
-            explicit Url(XERCES_CPP_NAMESPACE::DOMElement* e);
+            explicit Url(const XERCES_CPP_NAMESPACE::DOMElement* e);
             std::string location; //< The actual URL, including protocol
             UrlType type; //< What kind of URL this is
         };
@@ -79,7 +81,7 @@ namespace Base {
          * \brief Another package that this package depends on, conflicts with, or replaces
          */
         struct Dependency {
-            explicit Dependency(XERCES_CPP_NAMESPACE::DOMElement* e);
+            explicit Dependency(const XERCES_CPP_NAMESPACE::DOMElement* e);
             std::string package; //< Required: must exactly match the contents of the "name" element in the referenced package's package.xml file.
             std::string version_lt; //< Optional: The dependency to the package is restricted to versions less than the stated version number.
             std::string version_lte; //< Optional: The dependency to the package is restricted to versions less or equal than the stated version number.
@@ -96,7 +98,7 @@ namespace Base {
              * "condition" is specified, then that code is executed with this string provided as the variable
              * "$VERSION".
              */
-            bool matchesDependency(const std::string version) const;
+            bool matchesDependency(const std::string &version) const;
         };
 
         /**
@@ -108,7 +110,7 @@ namespace Base {
          * for convenient access by client code.
          */
         struct GenericMetadata {
-            explicit GenericMetadata(XERCES_CPP_NAMESPACE::DOMElement* e);
+            explicit GenericMetadata(const XERCES_CPP_NAMESPACE::DOMElement* e);
             std::string contents; //< The contents of the tag
             std::map<std::string,std::string> attributes; //< The XML attributes of the tag
         };
@@ -148,31 +150,55 @@ namespace Base {
          * This constructor takes a path to an XML file and loads the XML from that file as
          * metadata.
          */
-        explicit Metadata(const boost::filesystem::path& metadataFile);		
+        explicit Metadata(const boost::filesystem::path& metadataFile);
+
+        /**
+         * Construct a Metadata object from a DOM node.
+         * 
+         * This node may have any tag name: it is only accessed via its children, which are
+         * expected to follow the standard Metadata format for the contents of the <package> element.
+         */
+        Metadata(const XERCES_CPP_NAMESPACE::DOMNode* domNode, int format);
         
         ~Metadata();
 
 
         //////////////////////////////////////////////////////////////
-        // Required metadata
+        // Recognized Metadata
         //////////////////////////////////////////////////////////////
 
         std::string name() const; //< A short name for this package, often used as a menu entry.
-        std::string version() const; //< Human-readable version string -- typically in triplet format, e.g. "v1.2.3".
+        std::string version() const; //< Version string in symantic triplet format, e.g. "1.2.3".
         std::string description() const; //< Text-only description of the package. No markup.
         std::vector<Meta::Contact> maintainer() const; //< Must be at least one, and must specify an email address.
         std::vector<Meta::License> license() const; //< Must be at least one, and most licenses require including a license file.
-
-
-        //////////////////////////////////////////////////////////////
-        // Optional (recognized) metadata
-        //////////////////////////////////////////////////////////////
-
-        std::vector<Meta::Url> url() const; //< Any number of URLs may be specified (including zero).
+        std::vector<Meta::Url> url() const; //< Any number of URLs may be specified, but at least one repository URL must me included at the package level.
         std::vector<Meta::Contact> author() const; //< Any number of authors may be specified, and email addresses are optional.
         std::vector<Meta::Dependency> depend() const; //< Zero or more packages this package requires prior to use.
         std::vector<Meta::Dependency> conflict() const; //< Zero of more packages this package conflicts with.
         std::vector<Meta::Dependency> replace() const; //< Zero or more packages this package is intended to replace.
+        std::vector<std::string> tag() const; //< Zero or more text tags related to this package
+        boost::filesystem::path icon() const; //< Path to an icon file
+        std::string classname() const; //< Recognized for convenience -- generally only used by Workbenches
+        std::vector<boost::filesystem::path> file() const; //< Arbitrary files associated with this package or content item
+
+        /**
+         * Access the metadata for the content elements of this package
+         * 
+         * In addition to the overall package metadata, this class reads in metadata contained in a
+         * <content> element. Each entry in the content element is an element representing some
+         * type of package content (e.g. add-on, macro, theme, etc.). This class places no restriction
+         * on the types, it is up to client code to place requirements on the metadata included
+         * here.
+         * 
+         * For example, themes might be specified:
+         * <content>
+         *   <theme>
+         *     <name>High Contrast</name>
+         *   </theme>
+         * </content>
+         */
+        std::multimap<std::string, Metadata> content() const;
 
         /**
          * Convenience accessor for unrecognized simple metadata.
@@ -182,7 +208,7 @@ namespace Base {
          * operator[], which returns a (potentially empty) vector containing all instances of the
          * given tag.
          */
-        std::vector<Meta::GenericMetadata> operator[] (const std::string tag) const;
+        std::vector<Meta::GenericMetadata> operator[] (const std::string &tag) const;
         
         /**
          * Directly access the DOM tree to support unrecognized multi-level metadata
@@ -196,18 +222,24 @@ namespace Base {
         std::string _description;
         std::vector<Meta::Contact> _maintainer;
         std::vector<Meta::License> _license;
-
         std::vector<Meta::Url> _url;
         std::vector<Meta::Contact> _author;
         std::vector<Meta::Dependency> _depend;
         std::vector<Meta::Dependency> _conflict;
         std::vector<Meta::Dependency> _replace;
+        std::vector<std::string> _tag;
+        boost::filesystem::path _icon;
+        std::string _classname;
+        std::vector<boost::filesystem::path> _file;
+
+        std::multimap<std::string, Metadata> _content;
 
         std::vector<Meta::GenericMetadata> _genericMetadata;
 
         XERCES_CPP_NAMESPACE::DOMElement* _dom;
 
-        void parseVersion3();
+        void parseVersion3(const XERCES_CPP_NAMESPACE::DOMNode* startNode);
+        void parseContentNodeVersion3(const XERCES_CPP_NAMESPACE::DOMElement* contentNode);
     };
 
 }
