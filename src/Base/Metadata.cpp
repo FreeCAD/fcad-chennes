@@ -6,7 +6,7 @@
  *   This library is free software; you can redistribute it and/or         *
  *   modify it under the terms of the GNU Library General Public           *
  *   License as published by the Free Software Foundation; either          *
- *   version 2.1 of the License, or (at your option) any later version.    *
+ *   version 2 of the License, or (at your option) any later version.      *
  *                                                                         *
  *   This library  is distributed in the hope that it will be useful,      *
  *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
@@ -26,7 +26,7 @@
 # include <memory>
 #endif
 
-#include "MetadataReader.h"
+#include "Metadata.h"
 
 #include <xercesc/parsers/XercesDOMParser.hpp>
 #include <xercesc/dom/DOM.hpp>
@@ -86,7 +86,7 @@ Metadata::Metadata(const boost::filesystem::path& metadataFile)
     }
 }
 
-Base::Metadata::Metadata(const DOMNode* domNode, int format)
+Base::Metadata::Metadata(const DOMNode* domNode, int format) : _dom(nullptr)
 {
     auto element = dynamic_cast<const DOMElement*>(domNode);
     if (element) {
@@ -165,14 +165,28 @@ boost::filesystem::path Metadata::icon() const
     return _icon;
 }
 
+std::string Metadata::classname() const
+{
+    return _classname;
+}
+
+std::vector<boost::filesystem::path> Metadata::file() const
+{
+    return _file;
+}
+
 std::multimap<std::string, Metadata> Metadata::content() const
 {
     return _content;
 }
 
-std::vector<Meta::GenericMetadata> Metadata::operator[](const std::string &tag) const
+std::vector<Meta::GenericMetadata> Metadata::operator[](const std::string& tag) const
 {
-    return _genericMetadata;
+    std::vector<Meta::GenericMetadata> returnValue;
+    auto range = _genericMetadata.equal_range(tag);
+    for (auto item = range.first; item != range.second; ++item)
+        returnValue.push_back(item->second);
+    return returnValue;
 }
 
 XERCES_CPP_NAMESPACE::DOMElement* Metadata::dom() const
@@ -194,21 +208,6 @@ void Metadata::parseVersion3(const DOMNode *startNode)
         auto tagCString = XMLString::transcode(tag);
         std::string tagString(tagCString);
         XMLString::release(&tagCString);
-
-        /*
-         * <name>
-         * <version>
-         * <description>
-         * <maintainer> (multiple, but at least one: "email" attribute is required)
-         * <license> (multiple, but at least one: "file" attribute may contain path to full license)
-         * 
-         * The following is recognized (but not required) metadata:
-         * <url> (multiple: "type" attribute may be website (default), bugtracker or repository)
-         * <author> (multiple: "email" attribute is optional)
-         * <depend> (multiple: attributes described in Depend struct declaration)
-         * <conflict> (multiple: see depend)
-         * <replace> (multiple: see depend)
-         */
 
         if (tagString == "name")
             _name = transcodeToString(element->getTextContent());
@@ -239,9 +238,9 @@ void Metadata::parseVersion3(const DOMNode *startNode)
         else if (tagString == "icon")
             _icon = fs::path(transcodeToString(element->getTextContent()));
         else if (tagString == "content")
-            parseContentNodeVersion3(element);
+            parseContentNodeVersion3(element); // Recursive call
         else if (child->getChildNodes()->getLength() == 0)
-            _genericMetadata.emplace_back(element);
+            _genericMetadata.insert(std::make_pair(tagString, Meta::GenericMetadata(element)));
         // else we don't recognize this tag, just ignore it, but leave it in the DOM tree
     }
 }

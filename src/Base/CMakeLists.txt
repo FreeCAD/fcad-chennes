@@ -89,6 +89,7 @@ generate_from_xml(PlacementPy)
 generate_from_xml(AxisPy)
 generate_from_xml(UnitPy)
 generate_from_xml(QuantityPy)
+generate_from_xml(MetadataPy)
 generate_from_any(Parameter.xsd Parameter.inl xmlSchemeString)
 
 if(SWIG_FOUND)
@@ -168,6 +169,7 @@ SET(FreeCADBase_XML_SRCS
     BoundBoxPy.xml
     CoordinateSystemPy.xml
     MatrixPy.xml
+    MetadataPy.xml
     PersistencePy.xml
     PlacementPy.xml
     RotationPy.xml
@@ -251,7 +253,8 @@ SET(FreeCADBase_CPP_SRCS
     Matrix.cpp
     MatrixPyImp.cpp
     MemDebug.cpp
-    MetadataReader.cpp
+    Metadata.cpp
+    MetadataPyImp.cpp
     Parameter.xsd
     Parameter.cpp
     ParameterPy.cpp
@@ -268,7 +271,6 @@ SET(FreeCADBase_CPP_SRCS
     Stream.cpp
     Swap.cpp
     ${SWIG_SRCS}
-    ThemeManager.cpp
     TimeInfo.cpp
     Tools.cpp
     Tools2D.cpp
@@ -324,7 +326,7 @@ SET(FreeCADBase_HPP_SRCS
     Interpreter.h
     Matrix.h
     MemDebug.h
-    MetadataReader.h
+    Metadata.h
     Observer.h
     Parameter.h
     Persistence.h
@@ -337,7 +339,6 @@ SET(FreeCADBase_HPP_SRCS
     Stream.h
     Swap.h
     ${SWIG_HEADERS}
-    ThemeManager.h
     TimeInfo.h
     Tools.h
     Tools2D.h
