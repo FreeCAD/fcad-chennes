@@ -6,7 +6,7 @@
  *   This library is free software; you can redistribute it and/or         *
  *   modify it under the terms of the GNU Library General Public           *
  *   License as published by the Free Software Foundation; either          *
- *   version 2.1 of the License, or (at your option) any later version.    *
+ *   version 2 of the License, or (at your option) any later version.      *
  *                                                                         *
  *   This library  is distributed in the hope that it will be useful,      *
  *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
@@ -22,6 +22,8 @@
 
 #ifndef BASE_METADATAREADER_H 
 #define BASE_METADATAREADER_H 
+
+#include "FCConfig.h"
 
 #include <boost/filesystem.hpp>
 
@@ -121,27 +123,37 @@ namespace Base {
      * \class Metadata 
      * \brief Reads data from a metadata file.
      * 
-     * The metadata format is based on https://ros.org/reps/rep-0149.html
+     * The metadata format is based on https://ros.org/reps/rep-0149.html, modified for FreeCAD
+     * use. Full format documentation is available at the FreeCAD Wiki.
      * 
      * The following metadata is required, and guaranteed to exist upon class creation:
-     * <name>
-     * <version>
-     * <description>
+     * <name> (As displayed by package managers)
+     * <version> (Symantic triplet format)
+     * <description> (Text-only, should be only a few sentences)
      * <maintainer> (multiple, but at least one: "email" attribute is required)
      * <license> (multiple, but at least one: "file" attribute may contain path to full license)
+     * <url> (multiple: "type" attribute may be website (default), bugtracker, repository, readme, documentation. One repository is required.)
      * 
-     * The following is recognized (but not required) metadata:
-     * <url> (multiple: "type" attribute may be website (default), bugtracker or repository)
+     * Optional package-level metadata:
      * <author> (multiple: "email" attribute is optional)
      * <depend> (multiple: attributes described in Depend struct declaration)
      * <conflict> (multiple: see depend)
      * <replace> (multiple: see depend)
      * 
+     * In addition to the package-level metadata, each package consists of an arbitrary number
+     * of content items: at this time "macro", "workbench", and "theme" items, though nothing
+     * in this class restricts input to those tags and nothing need be changed to support others.
+     * Each content item itself can contain all of the metadata listed above. In addition, for
+     * convenience the following additional tags are supported directly:
+     * 
+     * <file> (Any number of files associated with this content item may be listed -- their meaning depends on the type.)
+     * <classname> (Typically only used for workbenches, the main Python class for the workbench)
+     * 
      * Any unrecognized metadata can be accessed by accessing the DOM tree directly using the 
      * provided member function, or (in the case of simple single-level metadata) by using
      * operator[].
      */
-    class Metadata {
+    class BaseExport Metadata {
     public:
 
         /**
@@ -172,7 +184,7 @@ namespace Base {
         std::string description() const; //< Text-only description of the package. No markup.
         std::vector<Meta::Contact> maintainer() const; //< Must be at least one, and must specify an email address.
         std::vector<Meta::License> license() const; //< Must be at least one, and most licenses require including a license file.
-        std::vector<Meta::Url> url() const; //< Any number of URLs may be specified, but at least one repository URL must me included at the package level.
+        std::vector<Meta::Url> url() const; //< Any number of URLs may be specified, but at least one repository URL must be included at the package level.
         std::vector<Meta::Contact> author() const; //< Any number of authors may be specified, and email addresses are optional.
         std::vector<Meta::Dependency> depend() const; //< Zero or more packages this package requires prior to use.
         std::vector<Meta::Dependency> conflict() const; //< Zero of more packages this package conflicts with.
@@ -234,7 +246,7 @@ namespace Base {
 
         std::multimap<std::string, Metadata> _content;
 
-        std::vector<Meta::GenericMetadata> _genericMetadata;
+        std::multimap<std::string, Meta::GenericMetadata> _genericMetadata;
 
         XERCES_CPP_NAMESPACE::DOMElement* _dom;
 
