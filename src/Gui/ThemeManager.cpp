@@ -30,61 +30,75 @@
 #include <boost/filesystem.hpp>
 
 #include "ThemeManager.h"
-#include "MetadataReader.h"
+#include "Base/Metadata.h"
 
-using namespace Base;
+#include <App/Application.h>
+
+using namespace Gui;
 using namespace xercesc;
 namespace fs = boost::filesystem;
 
 
-Theme::Theme(const fs::path& themeFile)
+Theme::Theme(const boost::filesystem::path& path, const Base::Metadata& metadata) : 
+	_path(path), _metadata (metadata)
 {
-	if (!fs::exists(themeFile)) {
-		throw std::runtime_error{ "Cannot access " + themeFile.string() };
+	if (!fs::exists(_path)) {
+		throw std::runtime_error{ "Cannot access " + path.string() };
 	}
-	_path = themeFile;
-	loadMetadata();
 }
 
 std::string Theme::name() const
 {
-	return std::string();
+	return _metadata.name();
 }
 
 void Theme::apply() const
 {
-	if (fs::is_directory(_path)) {
-	}
-	else {
-	}
-}
-
-void Base::Theme::loadMetadata()
-{
-	if (fs::is_directory(_path)) {
-		auto metadataFile = _path / "metadata.xml";
-		if (!fs::exists(metadataFile))
-			throw std::runtime_error("Cannot find " + metadataFile.string());
-		_metadata = std::make_unique<Metadata>(metadataFile);
-	}
-	else {
-		// This is a zipped archive: create the internal zipios stream
-	}
 }
 
 
 
-ThemeManager::ThemeManager()
+ThemeManager::ThemeManager(const std::vector<boost::filesystem::path> &themePaths) :
+	_themePaths (themePaths)
 {
+	rescan();
 }
 
 void ThemeManager::rescan()
 {
+	for (const auto& path : _themePaths) {
+		if (fs::exists(path) && fs::is_directory(path)) {
+			for (const auto& mod : fs::directory_iterator(path)) {
+				if (fs::is_directory(mod)) {
+					// Does this mod have a package.xml file? (required for themes)
+					auto packageMetadataFile = mod / "package.xml";
+					if (fs::exists(packageMetadataFile) && fs::is_regular_file(packageMetadataFile)) {
+						try {
+							Base::Metadata metadata(packageMetadataFile);
+							auto content = metadata.content();
+							for (const auto& item : content) {
+								if (item.first == "theme") {
+									Theme newTheme(mod, item.second);
+									_themes.insert(std::make_pair(newTheme.name(), newTheme));
+								}
+							}
+						}
+						catch (...) {
+							// Failed to read the metadata, or to create the theme based on it...
+						}
+					}
+				}
+			}
+		}
+	}
 }
 
 std::vector<std::string> ThemeManager::themeNames() const
 {
-	return std::vector<std::string>();
+	std::vector<std::string> names;
+	for (const auto &theme : _themes)
+		names.push_back(theme.first);
+	return names;
 }
 
 std::vector<const Theme *> ThemeManager::themes() const
@@ -94,6 +108,10 @@ std::vector<const Theme *> ThemeManager::themes() const
 
 void ThemeManager::apply(const std::string& themeName) const
 {
+	if (auto theme = _themes.find(themeName); theme != _themes.end())
+		theme->second.apply();
+	else
+		throw std::runtime_error("No such theme: " + themeName);
 }
 
 void ThemeManager::apply(const Theme& theme) const
