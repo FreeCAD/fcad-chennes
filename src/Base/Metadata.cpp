@@ -34,50 +34,36 @@
 #include <xercesc/util/XMLString.hpp>
 #include <xercesc/util/PlatformUtils.hpp>
 
+#include "XMLTools.h"
+
 using namespace Base;
 namespace fs = boost::filesystem;
 XERCES_CPP_NAMESPACE_USE
 
-
-std::string transcodeToString(const XMLCh* xml)
-{
-    auto temp = XMLString::transcode(xml);
-    auto s = std::string(temp);
-    XMLString::release(&temp);
-    return s;
-}
 
 Metadata::Metadata(const boost::filesystem::path& metadataFile)
 {
     // Any exception thrown by the XML code propagates out and prevents object creation
     XMLPlatformUtils::Initialize();
 
-    auto parser = std::make_unique<XercesDOMParser> ();
-    parser->setValidationScheme(XercesDOMParser::Val_Never);
-    parser->setDoNamespaces(true);
+    _parser = std::make_shared<XercesDOMParser> ();
+    _parser->setValidationScheme(XercesDOMParser::Val_Never);
+    _parser->setDoNamespaces(true);
 
     auto errHandler = std::make_unique<HandlerBase>();
-    parser->setErrorHandler(errHandler.get());
+    _parser->setErrorHandler(errHandler.get());
 
-    parser->parse(metadataFile.string().c_str());
+    _parser->parse(metadataFile.string().c_str());
 
-    auto doc = parser->getDocument();
+    auto doc = _parser->getDocument();
     _dom = doc->getDocumentElement();
 
-    auto tempString = XMLString::transcode("package");
-    auto rootTagName = _dom->getTagName();
-    if (XMLString::compareString(rootTagName, tempString) != 0)
+    auto rootTagName = StrXUTF8(_dom->getTagName()).str;
+    if (rootTagName != "package")
         throw std::runtime_error("package.xml must contain one, and only one, <package> element.");
-    XMLString::release(&tempString);
 
-    tempString = XMLString::transcode("format");
-    auto formatString = _dom->getAttribute(tempString);
-    if (XMLString::stringLen(formatString) == 0)
-        throw std::runtime_error("<package> must contain the 'format' attribute");
-    auto format = XMLString::parseInt(formatString);
-    XMLString::release(&tempString);
-    
-    switch (format) {
+    auto formatVersion = XMLString::parseInt(_dom->getAttribute(XUTF8Str("format").unicodeForm()));    
+    switch (formatVersion) {
     case 3:
         parseVersion3(_dom);
         break;
@@ -102,7 +88,6 @@ Base::Metadata::Metadata(const DOMNode* domNode, int format) : _dom(nullptr)
 
 Metadata::~Metadata()
 {
-    XMLPlatformUtils::Terminate();
 }
 
 std::string Metadata::name() const
@@ -205,16 +190,14 @@ void Metadata::parseVersion3(const DOMNode *startNode)
             continue;
 
         auto tag = element->getNodeName();
-        auto tagCString = XMLString::transcode(tag);
-        std::string tagString(tagCString);
-        XMLString::release(&tagCString);
+        auto tagString = StrXUTF8(tag).str;
 
         if (tagString == "name")
-            _name = transcodeToString(element->getTextContent());
+            _name = StrXUTF8(element->getTextContent()).str;
         else if (tagString == "version")
-            _version = transcodeToString(element->getTextContent());
+            _version = StrXUTF8(element->getTextContent()).str;
         else if (tagString == "description")
-            _description = transcodeToString(element->getTextContent());
+            _description = StrXUTF8(element->getTextContent()).str;
         else if (tagString == "maintainer")
             _maintainer.emplace_back(element);
         else if (tagString == "license")
@@ -230,13 +213,13 @@ void Metadata::parseVersion3(const DOMNode *startNode)
         else if (tagString == "replace")
             _replace.emplace_back(element);
         else if (tagString == "tag")
-            _tag.emplace_back(transcodeToString(element->getTextContent()));
+            _tag.emplace_back(StrXUTF8(element->getTextContent()).str);
         else if (tagString == "file")
-            _file.emplace_back(transcodeToString(element->getTextContent()));
+            _file.emplace_back(StrXUTF8(element->getTextContent()).str);
         else if (tagString == "classname")
-            _classname = transcodeToString(element->getTextContent());
+            _classname = StrXUTF8(element->getTextContent()).str;
         else if (tagString == "icon")
-            _icon = fs::path(transcodeToString(element->getTextContent()));
+            _icon = fs::path(StrXUTF8(element->getTextContent()).str);
         else if (tagString == "content")
             parseContentNodeVersion3(element); // Recursive call
         else if (child->getChildNodes()->getLength() == 0)
@@ -251,7 +234,7 @@ void Metadata::parseContentNodeVersion3(const DOMElement* contentNode)
     for (int i = 0; i < children->getLength(); ++i) {
         auto child = dynamic_cast<const DOMElement*>(children->item(i));
         if (child) {
-            auto tag = transcodeToString(child->getTagName());
+            auto tag = StrXUTF8(child->getTagName()).str;
             _content.insert(std::make_pair(tag, Metadata(child, 3)));
         }
     }
@@ -259,62 +242,46 @@ void Metadata::parseContentNodeVersion3(const DOMElement* contentNode)
 
 Meta::Contact::Contact(const XERCES_CPP_NAMESPACE::DOMElement* e)
 {
-    auto emailXmlCh = XMLString::transcode("email");
-    auto emailAttribute = e->getAttribute(emailXmlCh);
-    XMLString::release(&emailXmlCh);
-    name = transcodeToString(e->getTextContent());
-    email = transcodeToString(emailAttribute);
+    auto emailAttribute = e->getAttribute(XUTF8Str("email").unicodeForm());
+    name = StrXUTF8(e->getTextContent()).str;
+    email = StrXUTF8(emailAttribute).str;
 }
 
 Meta::License::License(const XERCES_CPP_NAMESPACE::DOMElement* e)
 {
-    auto fileXmlCh = XMLString::transcode("file");
-    auto fileAttribute = e->getAttribute(fileXmlCh);
-    XMLString::release(&fileXmlCh);
+    auto fileAttribute = e->getAttribute(XUTF8Str("file").unicodeForm());
     if (XMLString::stringLen(fileAttribute) > 0) {
-        file = fs::path(transcodeToString(fileAttribute));
+        file = fs::path(StrXUTF8(fileAttribute).str);
     }
-    name = transcodeToString(e->getTextContent());
+    name = StrXUTF8(e->getTextContent()).str;
 }
 
 Meta::Url::Url(const XERCES_CPP_NAMESPACE::DOMElement* e)
 {
-    auto typeXmlCh = XMLString::transcode("type");
-    auto typeAttribute = transcodeToString(e->getAttribute(typeXmlCh));
-    XMLString::release(&typeXmlCh);
+    auto typeAttribute = StrXUTF8(e->getAttribute(XUTF8Str("type").unicodeForm())).str;
     if (typeAttribute.empty() || typeAttribute == "website")
         type = UrlType::website;
     else if (typeAttribute == "bugtracker")
         type = UrlType::bugtracker;
     else if (typeAttribute == "repository")
         type = UrlType::repository;
-    location = transcodeToString(e->getTextContent());
+    else if (typeAttribute == "readme")
+        type = UrlType::readme;
+    else if (typeAttribute == "documentation")
+        type = UrlType::documentation;
+    location = StrXUTF8(e->getTextContent()).str;
 }
 
 Meta::Dependency::Dependency(const XERCES_CPP_NAMESPACE::DOMElement* e)
 {
-    auto ltXmlCh = XMLString::transcode("version_lt");
-    auto lteXmlCh = XMLString::transcode("version_lte");
-    auto eqXmlCh = XMLString::transcode("version_eq");
-    auto gteXmlCh = XMLString::transcode("version_gte");
-    auto gtXmlCh = XMLString::transcode("version_gt");
-    auto conditionXmlCh = XMLString::transcode("condition");
+    version_lt = StrXUTF8(e->getAttribute(XUTF8Str("version_lt").unicodeForm())).str;
+    version_lte = StrXUTF8(e->getAttribute(XUTF8Str("version_lte").unicodeForm())).str;
+    version_eq = StrXUTF8(e->getAttribute(XUTF8Str("version_eq").unicodeForm())).str;
+    version_gte = StrXUTF8(e->getAttribute(XUTF8Str("version_gte").unicodeForm())).str;
+    version_gt = StrXUTF8(e->getAttribute(XUTF8Str("version_gt").unicodeForm())).str;
+    condition = StrXUTF8(e->getAttribute(XUTF8Str("condition").unicodeForm())).str;
 
-    version_lt = transcodeToString(e->getAttribute(ltXmlCh));
-    version_lte = transcodeToString(e->getAttribute(lteXmlCh));
-    version_eq = transcodeToString(e->getAttribute(eqXmlCh));
-    version_gte = transcodeToString(e->getAttribute(gteXmlCh));
-    version_gt = transcodeToString(e->getAttribute(gtXmlCh));
-    condition = transcodeToString(e->getAttribute(conditionXmlCh));
-
-    XMLString::release(&ltXmlCh);
-    XMLString::release(&lteXmlCh);
-    XMLString::release(&eqXmlCh);
-    XMLString::release(&gteXmlCh);
-    XMLString::release(&gtXmlCh);
-    XMLString::release(&conditionXmlCh);
-
-    package = transcodeToString(e->getTextContent());
+    package = StrXUTF8(e->getTextContent()).str;
 }
 
 bool Meta::Dependency::matchesDependency(const std::string &version) const
@@ -324,10 +291,10 @@ bool Meta::Dependency::matchesDependency(const std::string &version) const
 
 Meta::GenericMetadata::GenericMetadata(const XERCES_CPP_NAMESPACE::DOMElement* e)
 {
-    contents = transcodeToString(e->getTextContent());
+    contents = StrXUTF8(e->getTextContent()).str;
     for (int i = 0; i < e->getAttributes()->getLength(); ++i) {
         auto a = e->getAttributes()->item(i);
-        attributes.insert(std::make_pair(transcodeToString(a->getNodeName()), 
-                                         transcodeToString(a->getTextContent())));
+        attributes.insert(std::make_pair(StrXUTF8(a->getNodeName()).str,
+                                         StrXUTF8(a->getTextContent()).str));
     }
 }

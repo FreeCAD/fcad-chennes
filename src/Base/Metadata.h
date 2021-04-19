@@ -32,6 +32,8 @@
 #include <map>
 
 #include <xercesc/dom/DOM.hpp>
+#include <xercesc/parsers/XercesDOMParser.hpp>
+
 
 namespace Base {
 
@@ -249,9 +251,11 @@ namespace Base {
         std::multimap<std::string, Meta::GenericMetadata> _genericMetadata;
 
         XERCES_CPP_NAMESPACE::DOMElement* _dom;
+        std::shared_ptr<XERCES_CPP_NAMESPACE::XercesDOMParser> _parser;
 
         void parseVersion3(const XERCES_CPP_NAMESPACE::DOMNode* startNode);
         void parseContentNodeVersion3(const XERCES_CPP_NAMESPACE::DOMElement* contentNode);
+
     };
 
 }
