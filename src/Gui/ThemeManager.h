@@ -26,10 +26,9 @@
 #include <vector>
 #include <string>
 
+#include "Base/Metadata.h"
 
-namespace Base {
-
-	class Metadata;
+namespace Gui {
 
 	/**
 	 * \class Theme A collection of user preferences stored in files on disk
@@ -39,12 +38,12 @@ namespace Base {
 	public:
 
 		/**
-		 * Construct a theme from a file/directory
+		 * Construct a theme from a directory
 		 * 
-		 * \param themeFile A path to either a *.FCTheme file (which is a zipped FCTheme directory),
-		 * or to a decompressed FCTheme directory.
+		 * \param path A path to a mod directory that contains a theme
+		 * \param metadata The metadata from the package.xml file describing this theme
 		 */
-		Theme(const boost::filesystem::path& themeFile);
+		Theme(const boost::filesystem::path& path, const Base::Metadata &metadata);
 
 		~Theme() = default;
 
@@ -60,15 +59,9 @@ namespace Base {
 
 	private:
 
-		std::unique_ptr<Metadata> _metadata;
 		boost::filesystem::path _path;
+		Base::Metadata _metadata;
 
-		/**
-		 * Opens the theme archive (if needed) and reads in the metadata.xml file
-		 */
-		void loadMetadata();
-
-		void parseMetadataFile(const boost::filesystem::path &file);
 	};
 
 
@@ -79,7 +72,7 @@ namespace Base {
 	 */
 	class ThemeManager {
 	public:
-		ThemeManager();
+		explicit ThemeManager(const std::vector<boost::filesystem::path> &themePaths);
 		~ThemeManager() = default;
 
 		/**
@@ -113,6 +106,10 @@ namespace Base {
 		 * If the named theme does not exist, this creates it on disk. If it does exist, this overwrites the original.
 		 */
 		void save(const std::string& name, const std::string &templateFile = std::string(), bool compress = true);
+
+	private:
+		std::vector<boost::filesystem::path> _themePaths;
+		std::map<std::string, Theme> _themes;
 
 	};
 
