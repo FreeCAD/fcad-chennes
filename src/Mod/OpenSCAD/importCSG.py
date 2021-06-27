@@ -491,7 +491,7 @@ def p_resize_action(p):
     transform_matrix.scale(scale)
 
     new_part=doc.addObject("Part::FeaturePython",'Matrix Deformation')
-    new_part.Shape = p[6][0].Shape.transformGeometry(transform_matrix)
+    new_part.Shape = p[6][0].Shape.copy().transformShape(transform_matrix, False, True)
     if gui:
         if FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Mod/OpenSCAD").\
             GetBool('useViewProviderTree'):
