@@ -24,6 +24,14 @@ IF (WIN32)
       /usr/local/lib
     )
 
+  ELSEIF (MINGW)
+    FIND_PACKAGE(Coin)
+    IF (Coin_FOUND)
+      SET( COIN3D_FOUND "YES" )
+      SET( COIN3D_INCLUDE_DIRS ${COIN_INCLUDE_DIRS} )
+      SET( COIN3D_LIBRARIES ${COIN_LIBRARIES} )
+    ENDIF()
+
   ELSE (CYGWIN)
 
     FIND_PATH(COIN3D_INCLUDE_DIRS Inventor/So.h
