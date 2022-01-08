@@ -86,6 +86,7 @@ class CommandAddonManager:
         "update_all_worker",
         "update_check_single_worker",
         "dependency_installation_worker",
+        "git_log_update_worker",
     ]
 
     lock = threading.Lock()
@@ -462,6 +463,7 @@ class CommandAddonManager:
             self.populate_macros,
             self.update_metadata_cache,
             self.check_updates,
+            self.check_git_log,
         ]
         pref = FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Addons")
         if pref.GetBool("DownloadMacros", False):
@@ -672,6 +674,16 @@ class CommandAddonManager:
         if repo.update_status == AddonManagerRepo.UpdateStatus.UPDATE_AVAILABLE:
             self.packages_with_updates.append(repo)
             self.enable_updates(len(self.packages_with_updates))
+
+    def check_git_log(self) -> None:
+        if self.update_cache:
+            self.git_log_update_worker = GitLogUpdateWorker(self.item_model.repos)
+            self.git_log_update_worker.finished.connect(self.do_next_startup_phase)
+            self.git_log_update_worker.progress_made.connect(self.update_progress_bar)
+            self.git_log_update_worker.status_message.connect(self.show_information)
+            self.git_log_update_worker.start()
+        else:
+            self.do_next_startup_phase()
 
     def enable_updates(self, number_of_updates: int) -> None:
         """enables the update button"""

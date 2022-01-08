@@ -1547,6 +1547,171 @@ if have_git and not NOGIT:
                 self.info_message.emit(message)
 
 
+class GitLogUpdateWorker(QtCore.QThread):
+    """Fetch the last git log entry for each git repo"""
+
+    progress_made = QtCore.Signal(int, int)
+    status_message = QtCore.Signal(str)
+    package_updated = QtCore.Signal(AddonManagerRepo)
+
+    def __init__(self, repos: List[AddonManagerRepo]):
+        super().__init__()
+        self.repos = repos
+        self.counter = 0
+        self.lock = threading.Lock()
+        self.workers = []
+        self.terminators = []
+
+    def run(self):
+
+        if NOGIT or not have_git:
+            return
+
+        self.progress_made.emit(0, len(self.repos))
+        self.repo_queue = queue.Queue()
+        current_thread = QtCore.QThread.currentThread()
+        num_repos = 0
+        for repo in self.repos:
+            if repo.repo_type != AddonManagerRepo.RepoType.MACRO:
+                num_repos += 1
+                self.repo_queue.put(repo)
+
+        # Following the QNetworkAccessManager model, we'll spawn six threads to process these requests in parallel:
+        workers = []
+        for _ in range(6):
+            self.update_and_advance(None)
+
+        while True:
+            if current_thread.isInterruptionRequested():
+                for worker in self.workers:
+                    worker.requestInterruption()
+                    worker.wait(100)
+                    if not worker.isFinished():
+                        # Kill it
+                        worker.terminate()
+                return
+            # Ensure our signals propagate out by running an internal thread-local event loop
+            QtCore.QCoreApplication.processEvents()
+            with self.lock:
+                if self.counter >= num_repos:
+                    break
+            time.sleep(0.1)
+
+        # Make sure all of our child threads have fully exited:
+        for worker in self.workers:
+            worker.wait(50)
+            if not worker.isFinished():
+                FreeCAD.Console.PrintError(
+                    f"Addon Manager: a worker process failed to complete while fetching {worker.repo.name}\n"
+                )
+                worker.terminate()
+
+        self.repo_queue.join()
+        for terminator in self.terminators:
+            if terminator and terminator.isActive():
+                terminator.stop()
+
+    def update_and_advance(self, repo: AddonManagerRepo) -> None:
+        if repo is not None:
+            self.package_updated.emit(repo)
+            self.repo_queue.task_done()
+            with self.lock:
+                self.counter += 1
+
+        if QtCore.QThread.currentThread().isInterruptionRequested():
+            return
+
+        self.progress_made.emit(
+            len(self.repos) - self.repo_queue.qsize(), len(self.repos)
+        )
+
+        try:
+            next_repo = self.repo_queue.get_nowait()
+            worker = GitLogUpdateSingleWorker(next_repo)
+            worker.finished.connect(lambda: self.update_and_advance(next_repo))
+            with self.lock:
+                self.workers.append(worker)
+                self.terminators.append(
+                    QtCore.QTimer.singleShot(20000, lambda: self.terminate(worker))
+                )
+            self.status_message.emit(
+                translate(
+                    "AddonsInstaller",
+                    f"Getting git log for {next_repo.name}",
+                )
+            )
+            worker.start()
+        except queue.Empty:
+            pass
+
+    def terminate(self, worker) -> None:
+        if not worker.isFinished():
+            FreeCAD.Console.PrintMessage(
+                f"Killing git log fetch for {worker.repo.name}\n"
+            )
+            worker.requestInterruption()
+            worker.wait(100)
+            if worker.isRunning():
+                worker.terminate()
+
+
+class GitLogUpdateSingleWorker(QtCore.QThread):
+
+    cache_path = None
+
+    def __init__(self, repo: AddonManagerRepo):
+        super().__init__()
+        self.repo = repo
+        self.git_python_repo = None
+
+        if self.cache_path is None:
+            cache_path = FreeCAD.getUserCachePath()
+            wb_path = os.path.join(cache_path, "AddonManager", "Workbenches")
+            os.makedirs(wb_path, exist_ok=True)
+            self.cache_path = wb_path
+
+    def run(self):
+
+        if NOGIT or not have_git:
+            return
+
+        wb_path = os.path.join(self.cache_path, self.repo.name)
+        git_path = os.path.join(wb_path, ".git")
+        if not os.path.isdir(wb_path) or not os.path.isdir(git_path):
+            os.makedirs(wb_path, exist_ok=True)
+            try:
+                bare_repo = git.Repo.clone_from(self.repo.url, git_path, bare=True)
+                with bare_repo.config_writer() as cw:
+                    cw.set("core", "bare", False)
+            except AttributeError:
+                FreeCAD.Console.PrintLog(
+                    translate(
+                        "AddonsInstaller",
+                        "Outdated GitPython detected, consider upgrading with pip.",
+                    )
+                    + "\n"
+                )
+                cw = bare_repo.config_writer()
+                cw.set("core", "bare", False)
+                del cw
+            except Exception as e:
+                FreeCAD.Console.PrintMessage(e)
+                return
+
+        self.git_python_repo = git.Repo(wb_path)
+        for remote in self.git_python_repo.remotes:
+            remote.fetch("+refs/heads/*:refs/remotes/origin/*")
+        for head in self.git_python_repo.heads:
+            if head.name == self.repo.branch:
+                self.repo.git_log_author = str(head.commit.author.name)
+                self.repo.git_log_hash = head.commit.name_rev
+                self.repo.git_log_subject = head.commit.summary
+                self.repo.git_log_timestamp = time.mktime(
+                    head.commit.committed_datetime.timetuple()
+                )
+                return
+
+
 class UpdateAllWorker(QtCore.QThread):
     """Update all listed packages, of any kind"""
 

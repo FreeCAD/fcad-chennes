@@ -342,7 +342,18 @@ class PackageListItemDelegate(QStyledItemDelegate):
         self.widget.ui.labelIcon.setText("")
         if repo.metadata:
             self.widget.ui.labelDescription.setText(repo.metadata.Description)
-            self.widget.ui.labelVersion.setText(f"<i>v{repo.metadata.Version}</i>")
+            self.widget.ui.labelVersion.setText(f"v{repo.metadata.Version}")
+            if repo.git_log_timestamp:
+                updated = (
+                    QDateTime.fromTime_t(repo.git_log_timestamp)
+                    .date()
+                    .toString(Qt.SystemLocaleShortDate)
+                )
+                self.widget.ui.labelVersion.setText(
+                    f"v{repo.metadata.Version}, "
+                    + translate("AddonsInstaller", "updated")
+                    + f" {updated}"
+                )
             if self.displayStyle == ListDisplayStyle.EXPANDED:
                 maintainers = repo.metadata.Maintainer
                 maintainers_string = ""
@@ -387,6 +398,15 @@ class PackageListItemDelegate(QStyledItemDelegate):
         else:
             self.widget.ui.labelDescription.setText("")
             self.widget.ui.labelVersion.setText("")
+            if repo.git_log_timestamp:
+                updated = (
+                    QDateTime.fromTime_t(repo.git_log_timestamp)
+                    .date()
+                    .toString(Qt.SystemLocaleShortDate)
+                )
+                self.widget.ui.labelVersion.setText(
+                    translate("AddonsInstaller", "Updated") + f" {updated}"
+                )
             if self.displayStyle == ListDisplayStyle.EXPANDED:
                 self.widget.ui.labelMaintainer.setText("")
 

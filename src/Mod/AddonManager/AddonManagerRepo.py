@@ -108,8 +108,14 @@ class AddonManagerRepo:
         self.updated_timestamp = None
         self.installed_version = None
 
+        # Git information (only relevant if this is a git repo)
+        self.git_log_timestamp: int = None
+        self.git_log_author: str = None
+        self.git_log_hash: str = None
+        self.git_log_subject: str = None
+
         # Each repo is also a node in a directed dependency graph (referenced by name so
-        # they cen be serialized):
+        # they can be serialized):
         self.requires: Set[str] = set()
         self.blocks: Set[str] = set()
 
@@ -174,6 +180,14 @@ class AddonManagerRepo:
             instance.python_requires = set(cache_dict["python_requires"])
             instance.python_optional = set(cache_dict["python_optional"])
 
+        if (
+            "git_log_timestamp" in cache_dict
+            and cache_dict["git_log_timestamp"] is not None
+        ):
+            instance.git_log_timestamp = int(
+                cache_dict["git_log_timestamp"]
+            )  # Ensure it's an integer
+
         return instance
 
     def to_cache(self) -> Dict:
@@ -194,6 +208,10 @@ class AddonManagerRepo:
             "blocks": list(self.blocks),
             "python_requires": list(self.python_requires),
             "python_optional": list(self.python_optional),
+            "git_log_timestamp": self.git_log_timestamp,
+            "git_log_author": self.git_log_author,
+            "git_log_hash": self.git_log_hash,
+            "git_log_subject": self.git_log_subject,
         }
 
     def load_metadata_file(self, file: str) -> None:
