@@ -1005,53 +1005,6 @@ class ShowWorker(QtCore.QThread):
             return message
         return None
 
-
-class GetMacroDetailsWorker(QtCore.QThread):
-    """Retrieve the macro details for a macro"""
-
-    status_message = QtCore.Signal(str)
-    readme_updated = QtCore.Signal(str)
-
-    def __init__(self, repo):
-
-        QtCore.QThread.__init__(self)
-        self.macro = repo.macro
-
-    def run(self):
-
-        self.status_message.emit(
-            translate("AddonsInstaller", "Retrieving macro description...")
-        )
-        if not self.macro.parsed and self.macro.on_git:
-            self.status_message.emit(
-                translate("AddonsInstaller", "Retrieving info from git")
-            )
-            self.macro.fill_details_from_file(self.macro.src_filename)
-        if not self.macro.parsed and self.macro.on_wiki:
-            self.status_message.emit(
-                translate("AddonsInstaller", "Retrieving info from wiki")
-            )
-            mac = self.macro.name.replace(" ", "_")
-            mac = mac.replace("&", "%26")
-            mac = mac.replace("+", "%2B")
-            url = "https://wiki.freecad.org/Macro_" + mac
-            self.macro.fill_details_from_wiki(url)
-        message = (
-            "<h1>"
-            + self.macro.name
-            + "</h1>"
-            + self.macro.desc
-            + '<br/><br/>Macro location: <a href="'
-            + self.macro.url
-            + '">'
-            + self.macro.url
-            + "</a>"
-        )
-        if QtCore.QThread.currentThread().isInterruptionRequested():
-            return
-        self.readme_updated.emit(message)
-
-
 class InstallWorkbenchWorker(QtCore.QThread):
     "This worker installs a workbench"
 
@@ -1672,4 +1625,228 @@ class UpdateSingleWorker(QtCore.QThread):
                 break
 
 
+class RepoListWorker(QtCore.QThread):
+    """A base class for a worker that does something to a list of workers. Subclasses must implement the
+    get_worker(self, repo) function to actual provide a function that performs some work."""
+
+    status_message = QtCore.Signal(str)
+    success = QtCore.Signal(AddonManagerRepo)
+    failure = QtCore.Signal(AddonManagerRepo)
+    progress_made = QtCore.Signal(int, int)
+
+    def __init__(self, repos: List[AddonManagerRepo], subthreads:int=6, timeout_ms:int=10000) -> None:
+        QtCore.QThread.__init__(self)
+        self.repos = repos
+        self.subthreads = subthreads
+        self.timeout_ms = timeout_ms
+        self.workers = []
+        self.terminators = []
+        self.lock = threading.Lock()
+        self.failed = []
+        self.counter = 0
+
+    def run(self):
+        self.repo_queue = queue.Queue()
+        current_thread = QtCore.QThread.currentThread()
+        num_macros = 0
+        for repo in self.repos:
+            if repo.macro is not None:
+                self.repo_queue.put(repo)
+                num_macros += 1
+
+        # Spool up our subthreads
+        for _ in range(self.subthreads):
+            self.update_and_advance(None)
+
+        while True:
+            if current_thread.isInterruptionRequested():
+                for worker in self.workers:
+                    worker.requestInterruption()
+                    if not worker.wait(100):
+                        worker.terminate()
+                return
+            # Ensure our signals propagate out by running an internal thread-local event loop
+            QtCore.QCoreApplication.processEvents(QtCore.QEventLoop.AllEvents, 50)
+            with self.lock:
+                if self.counter >= num_macros:
+                    break
+            time.sleep(0.1) # So we aren't hogging the lock
+
+        # Make sure all of our child threads have fully exited:
+        for worker in self.workers:
+            if not worker.wait(50):
+                FreeCAD.Console.PrintError(
+                    f"Addon Manager: a worker process failed to complete for {worker.repo.name}\n"
+                )
+                worker.terminate()
+
+        self.repo_queue.join()
+        for terminator in self.terminators:
+            if terminator and terminator.isActive():
+                terminator.stop()
+
+        if len(self.failed) > 0:
+            num_failed = len(self.failed)
+            FreeCAD.Console.PrintWarning(
+                translate(
+                    "AddonsInstaller",
+                    f"Out of {num_macros} repos, {num_failed} timed out while processing",
+                )
+            )
+
+    def update_and_advance(self, repo: AddonManagerRepo) -> None:
+        if repo is not None:
+            if repo.name not in self.failed:
+                self.success.emit(repo)
+            else:
+                self.failure.emit(repo)
+            self.repo_queue.task_done()
+            with self.lock:
+                self.counter += 1
+
+        if QtCore.QThread.currentThread().isInterruptionRequested():
+            return
+
+        self.progress_made.emit(
+            len(self.repos) - self.repo_queue.qsize(), len(self.repos)
+        )
+
+        try:
+            next_repo = self.repo_queue.get_nowait()
+            worker = self.get_worker(next_repo)
+            worker.finished.connect(lambda: self.update_and_advance(next_repo))
+            # Workers may provide a signal that indicates that they failed. If they do so, they should
+            # also provide a function called "get_name" with a string describing themselves, for use
+            # in the error message.
+            if hasattr(worker, "failed") and hasattr(worker,"get_name"):
+                worker.failed.connect(self.mark_failed)
+            with self.lock:
+                self.workers.append(worker)
+                self.terminators.append(
+                    QtCore.QTimer.singleShot(self.timeout_ms, lambda: self.terminate(worker))
+                )
+            self.status_message.emit(self.get_status_message(next_repo))
+            worker.start()
+        except queue.Empty:
+            pass
+
+    def terminate(self, worker) -> None:
+        if not worker.isFinished():
+            name = worker.get_name()
+            FreeCAD.Console.PrintWarning(
+                translate(
+                    "AddonsInstaller",
+                    f"Timeout while processing {name}",
+                )
+                + "\n"
+            )
+            worker.requestInterruption()
+            worker.wait(100)
+            if worker.isRunning():
+                worker.terminate()
+                if not worker.wait(50):
+                    FreeCAD.Console.PrintError(
+                        f"Failed to kill process for {name}!\n"
+                    )
+            self.mark_failed(name)
+
+    def mark_failed(self, repo) -> None:
+        with self.lock:
+            self.failed.append(repo.name)
+
+    def get_worker(self, _:AddonManagerRepo) -> QtCore.QThread:
+        """In subclasses this function should return a QThread-derived class instantiation thta performs some sort of work on a single repo"""
+        pass
+
+
+class CacheMacroCodeWorker(RepoListWorker):
+
+    def __init__(self, repos: List[AddonManagerRepo]) -> None:
+        super().__init__(repos)
+
+    def get_worker(self, repo:AddonManagerRepo) -> QtCore.QThread:
+        return GetMacroDetailsWorker(repo)
+
+    def get_status_message(self, repo:AddonManagerRepo) -> str:
+        return translate("AddonsInstaller",f"Getting information for macro {repo.name}")
+
+
+class GetMacroDetailsWorker(QtCore.QThread):
+    """Retrieve the macro details for a single macro"""
+
+    def __init__(self, repo):
+        super().__init__()
+        self.repo = repo
+        self.macro = repo.macro
+
+    def run(self):
+        if not self.macro.parsed and self.macro.on_git:
+            self.macro.fill_details_from_file(self.macro.src_filename)
+        if not self.macro.parsed and self.macro.on_wiki:
+            mac = self.macro.name.replace(" ", "_")
+            mac = mac.replace("&", "%26")
+            mac = mac.replace("+", "%2B")
+            url = "https://wiki.freecad.org/Macro_" + mac
+            self.macro.fill_details_from_wiki(url)
+
+    def get_name(self) -> str:
+        return translate("AddonsInstaller",f"getting details for {self.macro.name}")
+
+
+class UpdateAllReposWorker(RepoListWorker):
+
+    def __init__(self, repos: List[AddonManagerRepo]) -> None:
+        super().__init__(repos)
+
+    def get_worker(self, repo:AddonManagerRepo) -> QtCore.QThread:
+        return UpdateRepoWorker(repo)
+
+    def get_status_message(self, repo:AddonManagerRepo) -> str:
+        return translate("AddonsInstaller",f"Updating {repo.name}")
+
+
+class UpdateRepoWorker(QtCore.QThread):
+    failed = QtCore.Signal(AddonManagerRepo)
+
+    def __init__(self, repo:AddonManagerRepo):
+        super().__init__()
+        self.repo = repo
+
+    def get_name(self) -> str:
+        return translate("AddonsInstaller",f"updating {self.repo.name}")
+
+    def run(self):
+       
+        if self.repo.repo_type == AddonManagerRepo.RepoType.MACRO:
+            self.update_macro()
+        else:
+            self.update_package()
+
+    def update_macro(self):
+        """Updating a macro happens in this function, in the current thread"""
+
+        cache_path = os.path.join(
+            FreeCAD.getUserCachePath(), "AddonManager", "MacroCache"
+        )
+        os.makedirs(cache_path, exist_ok=True)
+        install_succeeded, _ = self.repo.macro.install(cache_path)
+
+        if install_succeeded:
+            install_succeeded, _ = self.repo.macro.install(FreeCAD.getUserMacroDir(True))
+            utils.update_macro_installation_details(self.repo)
+
+        if not install_succeeded:
+            self.failed.emit()
+
+    def update_package(self, repo: AddonManagerRepo):
+        """Updating a package re-uses the package installation worker, so actually spawns another thread that we block on"""
+
+        worker = InstallWorkbenchWorker(self.repo)
+        worker.failure.connect(lambda repo, _: self.failure.emit(repo))
+        worker.start()
+        while True:
+            # Ensure our signals propagate out by running an internal thread-local event loop
+            QtCore.QCoreApplication.processEvents()
+            if not worker.isRunning():
+                break
 #  @}

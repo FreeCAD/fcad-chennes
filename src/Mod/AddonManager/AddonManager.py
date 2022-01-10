@@ -667,11 +667,11 @@ class CommandAddonManager:
 
     def load_macro_metadata(self) -> None:
         if self.update_cache:
-            self.load_macro_metadata_worker = CacheMacroCode(self.item_model.repos)
+            self.load_macro_metadata_worker = CacheMacroCodeWorker(self.item_model.repos)
             self.load_macro_metadata_worker.status_message.connect(
                 self.show_information
             )
-            self.load_macro_metadata_worker.update_macro.connect(
+            self.load_macro_metadata_worker.success.connect(
                 self.on_package_updated
             )
             self.load_macro_metadata_worker.progress_made.connect(
@@ -974,9 +974,7 @@ class CommandAddonManager:
         self.install(repo)
 
     def cancel_dependency_installation(self) -> None:
-        self.dependency_installation_worker.finished.disconnect(
-            lambda: self.install(repo)
-        )
+        self.dependency_installation_worker.finished.blockSignals()
         self.dependency_installation_worker.requestInterruption()
         self.dependency_installation_dialog.hide()
 
@@ -1113,7 +1111,7 @@ class CommandAddonManager:
         self.show_progress_widgets()
         self.current_progress_region = 1
         self.number_of_progress_regions = 1
-        self.update_all_worker = UpdateAllWorker(self.packages_with_updates)
+        self.update_all_worker = UpdateAllReposWorker(self.packages_with_updates)
         self.update_all_worker.progress_made.connect(self.update_progress_bar)
         self.update_all_worker.status_message.connect(self.show_information)
         self.update_all_worker.success.connect(
