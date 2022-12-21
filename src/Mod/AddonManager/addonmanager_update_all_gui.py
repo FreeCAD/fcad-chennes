@@ -201,7 +201,7 @@ class UpdateAllGUI(QtCore.QObject):
         self._set_dialog_to_final_state(text1 + ": " + text2)
         self.running = False
 
-    def _set_dialog_to_final_state(self,new_content):
+    def _set_dialog_to_final_state(self, new_content):
         self.dialog.buttonBox.clear()
         self.dialog.buttonBox.addButton(QtWidgets.QDialogButtonBox.Close)
         self.dialog.label.setText(new_content)

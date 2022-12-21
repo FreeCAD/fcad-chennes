@@ -24,6 +24,7 @@
 
 """ Utilities to work across different platforms, providers and python versions """
 
+import io
 import os
 import platform
 import shutil
@@ -32,6 +33,7 @@ import subprocess
 import re
 import ctypes
 from typing import Optional, Any
+import zipfile
 
 from urllib.parse import urlparse
 
@@ -46,14 +48,30 @@ if FreeCAD.GuiUp:
     # loop running this is not possible, so fall back to requests (if available), or the native
     # Python urllib.request (if requests is not available).
     import NetworkManager  # Requires an event loop, so is only available with the GUI
+
+    UrlExceptionType = Exception
 else:
     try:
         import requests
+<<<<<<< HEAD
     except ImportError:
         requests = None
         import urllib.request
         import ssl
 
+=======
+
+        has_requests = True
+        UrlExceptionType = requests.RequestException
+    except ImportError:
+        has_requests = False
+        import urllib.request, urllib.error
+        import ssl
+
+        UrlExceptionType = urllib.error.URLError
+
+
+>>>>>>> 2ed2581bbe (App: Add metadata construct from buffer)
 #  @package AddonManager_utilities
 #  \ingroup ADDONMANAGER
 #  \brief Utilities to work across different platforms, providers and python versions
@@ -178,20 +196,25 @@ def recognized_git_location(repo) -> bool:
 
 
 def construct_git_url(repo, filename):
-    """Returns a direct download link to a file in an online Git repo"""
+    """Returns a direct download link to a file in a Git repo"""
 
-    parsed_url = urlparse(repo.url)
+    url = repo.url.replace(os.path.sep, "/")
+    parsed_url = urlparse(url)
+    filename = filename.replace(os.path.sep, "/")
+    if parsed_url.scheme == "file":
+        # Handle file:// URLs
+        return f"{url}/{filename}"
     if parsed_url.netloc == "github.com":
-        return f"{repo.url}/raw/{repo.branch}/{filename}"
+        return f"{url}/raw/{repo.branch}/{filename}"
     if parsed_url.netloc in ["gitlab.com", "framagit.org", "salsa.debian.org"]:
-        return f"{repo.url}/-/raw/{repo.branch}/{filename}"
+        return f"{url}/-/raw/{repo.branch}/{filename}"
     FreeCAD.Console.PrintLog(
         "Debug: addonmanager_utilities.construct_git_url: Unknown git host:"
         + parsed_url.netloc
         + f" for file {filename}\n"
     )
-    # Assume it's some kind of local GitLab instance...
-    return f"{repo.url}/-/raw/{repo.branch}/{filename}"
+    # Assume it's some kind of GitLab instance...
+    return f"{url}/-/raw/{repo.branch}/{filename}"
 
 
 def get_readme_url(repo):
@@ -396,23 +419,42 @@ def get_cache_file_name(file: str) -> str:
     return os.path.join(am_path, file)
 
 
-def blocking_get(url: str, method=None) -> str:
+def blocking_get(url: str, method=None) -> bytes:
     """Wrapper around three possible ways of accessing data, depending on the current run mode and
-    Python installation. Blocks until complete, and returns the text results of the call if it
-    succeeded, or an empty string if it failed, or returned no data. The method argument is
+    Python installation. Blocks until complete, and returns the results of the call if it
+    succeeded, or an empty bytes object if it failed, or returned no data. The method argument is
     provided mainly for testing purposes."""
+<<<<<<< HEAD
     p = ""
     if FreeCAD.GuiUp and method is None or method == "networkmanager":
         NetworkManager.InitializeNetworkManager()
         p = NetworkManager.AM_NETWORK_MANAGER.blocking_get(url)
     elif requests and method is None or method == "requests":
+=======
+    p = bytes()
+    parsed_url = urlparse(url)
+    if parsed_url.scheme == "file":
+        path = parsed_url.path
+        if path.startswith("/"):
+            path = path[1:]
+        if not os.path.isfile(path):
+            raise UrlExceptionType(f"No such file: {path}")
+        with open(path, "rb") as f:
+            p = f.read()
+    elif FreeCAD.GuiUp and method is None or method == "networkmanager":
+        nm = NetworkManager.GetNetworkManager()
+        p = nm.blocking_get(url)
+        if p is not None and hasattr(p, "data"):
+            p = p.data()
+    elif has_requests and method is None or method == "requests":
+>>>>>>> 2ed2581bbe (App: Add metadata construct from buffer)
         response = requests.get(url)
         if response.status_code == 200:
-            p = response.text
+            p = response.raw
     else:
         ctx = ssl.create_default_context()
         with urllib.request.urlopen(url, context=ctx) as f:
-            p = f.read().decode("utf-8")
+            p = f.read()
     return p
 
 
@@ -465,3 +507,37 @@ def get_main_am_window():
             return widget.centralWidget()
     # Why is this code even getting called?
     return None
+
+
+def clean_git_url(repo):
+    """Strip trailing slashes, remove .git, and extract the name"""
+    if repo["url"][-1] == "/":
+        repo["url"] = repo["url"][0:-1]  # Strip trailing slash
+    repo["url"] = repo["url"].split(".git")[0]  # Remove .git
+    repo["name"] = repo["url"].split("/")[-1]
+
+
+def extract_git_repo_zipfile(zip_data, destination: os.PathLike, branch: str = ""):
+    """Extract a zipfile into a given destination, possibly moving its contents from a subdirectory
+    called "branch" into the toplevel (used for sites like GitHub that place the data in a
+    subdirectory named for the current branch). zip_data may be either a path to a local zipfile,
+    or a bytes-like object containing zip data."""
+    if isinstance(zip_data, str) and os.path.exists(zip_data):
+        zip_file_like = io.FileIO(zip_data)
+    else:
+        zip_file_like = io.BytesIO(zip_data)
+    with zipfile.ZipFile(zip_file_like, "r") as zfile:
+        zfile.extractall(destination)
+
+    # GitHub (and possibly other hosts) put all files in the zip into a subdirectory named
+    # after the branch. If that is the setup that we just extracted, move all files out of
+    # that subdirectory.
+    directory_contents = os.listdir(destination)
+    if len(directory_contents) == 1 and directory_contents[0].endswith(branch):
+        subdirectory = directory_contents[0]
+        for extracted_filename in os.listdir(os.path.join(destination, subdirectory)):
+            shutil.move(
+                os.path.join(destination, subdirectory, extracted_filename),
+                os.path.join(destination, extracted_filename),
+            )
+        rmdir(os.path.join(destination, subdirectory))

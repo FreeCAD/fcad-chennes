@@ -27,15 +27,12 @@ import unittest
 import os
 import shutil
 import tempfile
-import time
 from zipfile import ZipFile
 import FreeCAD
 
-from typing import Dict
-
 from addonmanager_installer import InstallationMethod, AddonInstaller, MacroInstaller
 
-from addonmanager_git import GitManager, initialize_git
+from addonmanager_git import initialize_git
 
 from Addon import Addon
 
@@ -160,41 +157,54 @@ class TestAddonInstaller(unittest.TestCase):
         """When there is a subdirectory with the branch name in it, find it"""
         installer = AddonInstaller(self.mock_addon, [])
         with tempfile.TemporaryDirectory() as temp_dir:
-            os.mkdir(os.path.join(temp_dir,f"{self.mock_addon.name}-{self.mock_addon.branch}"))
+            os.mkdir(
+                os.path.join(
+                    temp_dir, f"{self.mock_addon.name}-{self.mock_addon.branch}"
+                )
+            )
             result = installer._code_in_branch_subdirectory(temp_dir)
-            self.assertTrue(result,"Failed to find ZIP subdirectory")
+            self.assertTrue(result, "Failed to find ZIP subdirectory")
 
     def test_code_in_branch_subdirectory_false(self):
         """When there is not a subdirectory with the branch name in it, don't find one"""
         installer = AddonInstaller(self.mock_addon, [])
         with tempfile.TemporaryDirectory() as temp_dir:
             result = installer._code_in_branch_subdirectory(temp_dir)
-            self.assertFalse(result,"Found ZIP subdirectory when there was none")
+            self.assertFalse(result, "Found ZIP subdirectory when there was none")
 
     def test_code_in_branch_subdirectory_more_than_one(self):
         """When there are multiple subdirectories, never find a branch subdirectory"""
         installer = AddonInstaller(self.mock_addon, [])
         with tempfile.TemporaryDirectory() as temp_dir:
-            os.mkdir(os.path.join(temp_dir,f"{self.mock_addon.name}-{self.mock_addon.branch}"))
-            os.mkdir(os.path.join(temp_dir,"AnotherSubdir"))
+            os.mkdir(
+                os.path.join(
+                    temp_dir, f"{self.mock_addon.name}-{self.mock_addon.branch}"
+                )
+            )
+            os.mkdir(os.path.join(temp_dir, "AnotherSubdir"))
             result = installer._code_in_branch_subdirectory(temp_dir)
-            self.assertFalse(result,"Found ZIP subdirectory when there were multiple subdirs")
+            self.assertFalse(
+                result, "Found ZIP subdirectory when there were multiple subdirs"
+            )
 
     def test_move_code_out_of_subdirectory(self):
         """All files are moved out and the subdirectory is deleted"""
         installer = AddonInstaller(self.mock_addon, [])
         with tempfile.TemporaryDirectory() as temp_dir:
-            subdir = os.path.join(temp_dir,f"{self.mock_addon.name}-{self.mock_addon.branch}")
+            subdir = os.path.join(
+                temp_dir, f"{self.mock_addon.name}-{self.mock_addon.branch}"
+            )
             os.mkdir(subdir)
-            with open(os.path.join(subdir,"README.txt"),"w",encoding="utf-8") as f:
+            with open(os.path.join(subdir, "README.txt"), "w", encoding="utf-8") as f:
                 f.write("# Test file for unit testing")
-            with open(os.path.join(subdir,"AnotherFile.txt"),"w",encoding="utf-8") as f:
+            with open(
+                os.path.join(subdir, "AnotherFile.txt"), "w", encoding="utf-8"
+            ) as f:
                 f.write("# Test file for unit testing")
             installer._move_code_out_of_subdirectory(temp_dir)
-            self.assertTrue(os.path.isfile(os.path.join(temp_dir,"README.txt")))
-            self.assertTrue(os.path.isfile(os.path.join(temp_dir,"AnotherFile.txt")))
+            self.assertTrue(os.path.isfile(os.path.join(temp_dir, "README.txt")))
+            self.assertTrue(os.path.isfile(os.path.join(temp_dir, "AnotherFile.txt")))
             self.assertFalse(os.path.isdir(subdir))
-
 
     def test_install_by_git(self):
         """Test using git to install. Depends on there being a local git installation: the test
@@ -341,7 +351,9 @@ class TestAddonInstaller(unittest.TestCase):
 
         for site in ["github.org", "gitlab.org", "framagit.org", "salsa.debian.org"]:
             with self.subTest(site=site):
-                temp_file = f"https://{site}/dummy/dummy"  # Doesn't have to actually exist!
+                temp_file = (
+                    f"https://{site}/dummy/dummy"  # Doesn't have to actually exist!
+                )
                 method = installer._determine_install_method(
                     temp_file, InstallationMethod.COPY
                 )
@@ -355,7 +367,9 @@ class TestAddonInstaller(unittest.TestCase):
 
         for site in ["github.org", "gitlab.org", "framagit.org", "salsa.debian.org"]:
             with self.subTest(site=site):
-                temp_file = f"https://{site}/dummy/dummy"  # Doesn't have to actually exist!
+                temp_file = (
+                    f"https://{site}/dummy/dummy"  # Doesn't have to actually exist!
+                )
                 method = installer._determine_install_method(
                     temp_file, InstallationMethod.GIT
                 )
@@ -373,7 +387,9 @@ class TestAddonInstaller(unittest.TestCase):
 
         for site in ["github.org", "gitlab.org", "framagit.org", "salsa.debian.org"]:
             with self.subTest(site=site):
-                temp_file = f"https://{site}/dummy/dummy"  # Doesn't have to actually exist!
+                temp_file = (
+                    f"https://{site}/dummy/dummy"  # Doesn't have to actually exist!
+                )
                 method = installer._determine_install_method(
                     temp_file, InstallationMethod.ZIP
                 )
@@ -391,7 +407,9 @@ class TestAddonInstaller(unittest.TestCase):
 
         for site in ["github.org", "gitlab.org", "framagit.org", "salsa.debian.org"]:
             with self.subTest(site=site):
-                temp_file = f"https://{site}/dummy/dummy"  # Doesn't have to actually exist!
+                temp_file = (
+                    f"https://{site}/dummy/dummy"  # Doesn't have to actually exist!
+                )
                 method = installer._determine_install_method(
                     temp_file, InstallationMethod.ANY
                 )
@@ -409,7 +427,9 @@ class TestAddonInstaller(unittest.TestCase):
 
         for site in ["github.org", "gitlab.org", "framagit.org", "salsa.debian.org"]:
             with self.subTest(site=site):
-                temp_file = f"https://{site}/dummy/dummy"  # Doesn't have to actually exist!
+                temp_file = (
+                    f"https://{site}/dummy/dummy"  # Doesn't have to actually exist!
+                )
                 method = installer._determine_install_method(
                     temp_file, InstallationMethod.ANY
                 )

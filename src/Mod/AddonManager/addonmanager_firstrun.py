@@ -38,7 +38,8 @@ import addonmanager_utilities as utils
 class FirstRunDialog:
     """Manage the display of the Addon Manager's first-run dialog, setting up some user
     preferences and making sure they are aware that this connects to the internet, downloads
-    data, and possiibly installs things that run code not affiliated with FreeCAD itself."""
+    data, and possiibly installs things that run code not affiliated with FreeCAD itself.
+    """
 
     def __init__(self):
         self.pref = FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Addons")
@@ -46,7 +47,8 @@ class FirstRunDialog:
 
     def exec(self) -> bool:
         """Display a first-run dialog if needed, and return True to indicate the Addon Manager
-        should continue loading, or False if the user cancelled the dialog and wants to exit."""
+        should continue loading, or False if the user cancelled the dialog and wants to exit.
+        """
         if not self.readWarning:
             warning_dialog = FreeCADGui.PySideUic.loadUi(
                 os.path.join(os.path.dirname(__file__), "first_run.ui")

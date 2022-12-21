@@ -33,11 +33,14 @@ import FreeCAD
 
 from addonmanager_git import GitManager, NoGitFound, GitFailed
 
+do_slow_tests = False
+
 
 class TestGit(unittest.TestCase):
 
     MODULE = "test_git"  # file name without extension
 
+    @unittest.skipUnless(do_slow_tests, "Slow tests disabled")
     def setUp(self):
         """Set up the test case: called by the unit test system"""
         self.cwd = os.getcwd()

@@ -1,24 +1,22 @@
-# -*- coding: utf-8 -*-
-
 # ***************************************************************************
+# *                                                                         *
 # *   Copyright (c) 2022 FreeCAD Project Association                        *
 # *                                                                         *
-# *   This file is part of the FreeCAD CAx development system.              *
+# *   This file is part of FreeCAD.                                         *
 # *                                                                         *
-# *   This library is free software; you can redistribute it and/or         *
-# *   modify it under the terms of the GNU Lesser General Public            *
-# *   License as published by the Free Software Foundation; either          *
-# *   version 2.1 of the License, or (at your option) any later version.    *
+# *   FreeCAD is free software: you can redistribute it and/or modify it    *
+# *   under the terms of the GNU Lesser General Public License as           *
+# *   published by the Free Software Foundation, either version 2.1 of the  *
+# *   License, or (at your option) any later version.                       *
 # *                                                                         *
-# *   This library is distributed in the hope that it will be useful,       *
-# *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
-# *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU     *
+# *   FreeCAD is distributed in the hope that it will be useful, but        *
+# *   WITHOUT ANY WARRANTY; without even the implied warranty of            *
+# *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU      *
 # *   Lesser General Public License for more details.                       *
 # *                                                                         *
 # *   You should have received a copy of the GNU Lesser General Public      *
-# *   License along with this library; if not, write to the Free Software   *
-# *   Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA         *
-# *   02110-1301  USA                                                       *
+# *   License along with FreeCAD. If not, see                               *
+# *   <https://www.gnu.org/licenses/>.                                      *
 # *                                                                         *
 # ***************************************************************************
 
@@ -33,24 +31,38 @@ class TestMetadata(unittest.TestCase):
     def setUp(self):
         self.test_dir = os.path.join(FreeCAD.getHomePath(), "Mod", "Test", "TestData")
 
-    def test_xml_constructor(self):
+    def test_xml_constructor_working(self):
         try:
             filename = os.path.join(self.test_dir, "basic_metadata.xml")
             md = FreeCAD.Metadata(filename)
+            self.assertEqual(md.Name, "Test Workbench")
         except Exception:
             self.fail("Metadata construction from XML file failed")
 
+    def test_xml_constructor_bad_root(self):
         with self.assertRaises(FreeCAD.Base.XMLBaseException, msg="Metadata construction from XML file with bad root node did not raise an exception"):
             filename = os.path.join(self.test_dir, "bad_root_node.xml")
-            md = FreeCAD.Metadata(filename)
+            FreeCAD.Metadata(filename)
 
+    def test_xml_constructor_invalid_xml(self):
         with self.assertRaises(FreeCAD.Base.XMLBaseException, msg="Metadata construction from invalid XML file did not raise an exception"):
             filename = os.path.join(self.test_dir, "bad_xml.xml")
-            md = FreeCAD.Metadata(filename)
+            FreeCAD.Metadata(filename)
 
+    def test_xml_constructor_bad_version(self):
         with self.assertRaises(FreeCAD.Base.XMLBaseException, msg="Metadata construction from XML file with invalid version did not raise an exception"):
             filename = os.path.join(self.test_dir, "bad_version.xml")
-            md = FreeCAD.Metadata(filename)
+            FreeCAD.Metadata(filename)
+
+    def test_construction_from_buffer(self):
+        filename = os.path.join(self.test_dir, "basic_metadata.xml")
+        with open(filename, "rb") as f:
+            byte_data = f.read()
+            try:
+                md = FreeCAD.Metadata(byte_data)
+                self.assertEqual(md.Name, "Test Workbench")
+            except Exception:
+                self.fail("Metadata construction from buffer failed")
 
     def test_toplevel_tags(self):
         filename = os.path.join(self.test_dir, "basic_metadata.xml")

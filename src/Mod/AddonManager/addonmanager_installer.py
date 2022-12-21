@@ -32,7 +32,6 @@ import shutil
 from typing import List, Optional
 import tempfile
 from urllib.parse import urlparse
-import zipfile
 
 import FreeCAD
 
@@ -43,7 +42,7 @@ import addonmanager_utilities as utils
 from addonmanager_git import initialize_git, GitFailed
 
 if FreeCAD.GuiUp:
-    import NetworkManager  # Requires an event loop
+    from NetworkManager import GetNetworkManager  # Requires an event loop
 
 translate = FreeCAD.Qt.translate
 
@@ -194,7 +193,7 @@ class AddonInstaller(QtCore.QObject):
             FreeCAD.Console.PrintLog(
                 "Overriding local ALLOWED_PYTHON_PACKAGES.txt with newer remote version\n"
             )
-            p = p.data().decode("utf8")
+            p = p.decode("utf8")
             lines = p.split("\n")
             cls.allowed_packages.clear()  # Unset the locally-defined list
             for line in lines:
@@ -210,7 +209,8 @@ class AddonInstaller(QtCore.QObject):
     ) -> Optional[InstallationMethod]:
         """Given a URL and preferred installation method, determine the actual installation method
         to use. Will return either None, if installation is not possible for the given url and
-        method, or a specific concrete method (GIT, ZIP, or COPY) based on the inputs."""
+        method, or a specific concrete method (GIT, ZIP, or COPY) based on the inputs.
+        """
 
         # If we don't have access to git, and that is the method selected, return early
         if not self.git_manager and install_method == InstallationMethod.GIT:
@@ -292,7 +292,8 @@ class AddonInstaller(QtCore.QObject):
     def _install_by_zip(self) -> bool:
         """Installs the specified url by downloading the file (if it is remote) and unzipping it
         into the appropriate installation location. If the GUI is running the download is
-        asynchronous, and issues periodic updates about how much data has been downloaded."""
+        asynchronous, and issues periodic updates about how much data has been downloaded.
+        """
         if self.addon_to_install.url.endswith(".zip"):
             zip_url = self.addon_to_install.url
         else:
@@ -319,11 +320,10 @@ class AddonInstaller(QtCore.QObject):
         """Runs the zip downloader in a private event loop. This function does not exit until the
         ZIP download is complete. It requires the GUI to be up, and should not be run on the main
         GUI thread."""
-        NetworkManager.AM_NETWORK_MANAGER.progress_made.connect(self._update_zip_status)
-        NetworkManager.AM_NETWORK_MANAGER.progress_complete.connect(self._finish_zip)
-        self.zip_download_index = (
-            NetworkManager.AM_NETWORK_MANAGER.submit_monitored_get(zip_url)
-        )
+        nm = GetNetworkManager()
+        nm.progress_made.connect(self._update_zip_status)
+        nm.progress_complete.connect(self._finish_zip)
+        self.zip_download_index = nm.submit_monitored_get(zip_url)
         while self.zip_download_index is not None:
             if QtCore.QThread.currentThread().isInterruptionRequested():
                 break
@@ -361,16 +361,9 @@ class AddonInstaller(QtCore.QObject):
         subdirectory of the main directory."""
 
         destination = os.path.join(self.installation_path, self.addon_to_install.name)
-        with zipfile.ZipFile(filename, "r") as zfile:
-            zfile.extractall(destination)
-
-        # GitHub (and possibly other hosts) put all files in the zip into a subdirectory named
-        # after the branch. If that is the setup that we just extracted, move all files out of
-        # that subdirectory.
-        if self._code_in_branch_subdirectory(destination):
-            self._move_code_out_of_subdirectory(destination)
-
-        FreeCAD.Console.PrintLog("ZIP installation complete.\n")
+        utils.extract_git_repo_zipfile(
+            filename, destination, self.addon_to_install.branch
+        )
         self._finalize_successful_installation()
 
     def _code_in_branch_subdirectory(self, destination: str) -> bool:

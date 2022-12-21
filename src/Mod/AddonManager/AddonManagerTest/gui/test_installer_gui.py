@@ -22,6 +22,7 @@
 # ***************************************************************************
 
 import os
+from time import sleep
 import tempfile
 import unittest
 import FreeCAD
@@ -44,7 +45,6 @@ class TestInstallerGui(unittest.TestCase):
         self.addon_to_install = MockAddon()
         self.installer_gui = AddonInstallerGUI(self.addon_to_install)
         self.finalized_thread = False
-
 
     def tearDown(self):
         pass
@@ -124,22 +124,50 @@ class TestInstallerGui(unittest.TestCase):
         )
 
     def test_install(self):
-        # Run the installation code and make sure it puts the directory in place
-        with tempfile.TemporaryDirectory() as temp_dir:
-            self.installer_gui.installer.installation_path = temp_dir
-            self.installer_gui.install()  # This does not block
-            self.installer_gui.installer.success.disconnect(
-                self.installer_gui._installation_succeeded
-            )
-            self.installer_gui.installer.failure.disconnect(
-                self.installer_gui._installation_failed
-            )
-            while not self.installer_gui.worker_thread.isFinished():
-                QtCore.QCoreApplication.processEvents(QtCore.QEventLoop.AllEvents, 100)
-            self.assertTrue(
-                os.path.exists(os.path.join(temp_dir, "MockAddon")),
-                "Installed directory not found",
-            )
+        """Installer gui calls the installer, which runs to completion"""
+
+        class MockInstaller(QtCore.QObject):
+            finished = QtCore.Signal()
+
+            def __init__(self):
+                super().__init__()
+                self.timer_interval = 10
+                self.iterations = 5
+                self.ran_to_completion = False
+                self.counter = 0
+
+            def run(self):
+                self.timer = QtCore.QTimer()
+                self.timer.setInterval(self.timer_interval)
+                self.timer.timeout.connect(self.do_work)
+                self.timer.start()
+
+            def do_work(self):
+                self.counter += 1
+                if self.counter == self.iterations:
+                    self.ran_to_completion = True
+                    self.timer.stop()
+                    self.finished.emit()
+                    return
+                if QtCore.QApplication.currentThread().isInterruptionRequested():
+                    self.timer.stop()
+                    self.finished.emit()
+
+        self.installer_gui.installer = MockInstaller()
+        self.installer_gui.install()  # This does not block
+        dialog_popped_up = False
+        while not self.installer_gui.worker_thread.isFinished():
+            QtCore.QCoreApplication.processEvents(QtCore.QEventLoop.AllEvents, 10)
+            if self.installer_gui.installing_dialog.isVisible():
+                dialog_popped_up = True
+        self.assertTrue(self.installer_gui.installer.ran_to_completion)
+        self.assertTrue(dialog_popped_up)
+
+        while self.installer_gui.installing_dialog.isVisible():
+            # Give the hide() signal time to propagate
+            QtCore.QCoreApplication.processEvents(QtCore.QEventLoop.AllEvents, 10)
+
+        self.assertFalse(self.installer_gui.installing_dialog.isVisible())
 
     def test_handle_disallowed_python(self):
         disallowed_packages = ["disallowed_package_name"]

@@ -606,7 +606,11 @@ class DeveloperMode:
         for dir_path, _, filenames in os.walk(self.current_mod):
             for filename in filenames:
                 if filename.endswith(".py"):
+<<<<<<< HEAD
                     with open(os.path.join(dir_path, filename), encoding="utf-8") as f:
+=======
+                    with open(os.path.join(dirpath, filename), encoding="utf-8") as f:
+>>>>>>> 2ed2581bbe (App: Add metadata construct from buffer)
                         contents = f.read()
                         version_strings = vermin.version_strings(
                             vermin.detect(contents)

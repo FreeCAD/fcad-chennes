@@ -1,6 +1,9 @@
+<<<<<<< HEAD
 #!/usr/bin/env python
 
 # SPDX-License-Identifier: LGPL-2.1-or-later
+=======
+>>>>>>> 2ed2581bbe (App: Add metadata construct from buffer)
 # ***************************************************************************
 # *                                                                         *
 # *   Copyright (c) 2022-2023 FreeCAD Project Association                   *
@@ -38,22 +41,19 @@ from PySide import QtGui, QtCore, QtWidgets
 import FreeCAD
 import FreeCADGui
 
+# The source class handles all local and remote data fetches and creates the core list of addons
+# that the rest of the Addon Manager then manipulates.
+from addonmanager_source import AddonManagerSource
+
 from addonmanager_workers_startup import (
-    CreateAddonListWorker,
-    LoadPackagesFromCacheWorker,
-    LoadMacrosFromCacheWorker,
     CheckWorkbenchesForUpdatesWorker,
-    CacheMacroCodeWorker,
-)
-from addonmanager_workers_installation import (
-    UpdateMetadataCacheWorker,
 )
 from addonmanager_installer_gui import AddonInstallerGUI, MacroInstallerGUI
 from addonmanager_uninstaller_gui import AddonUninstallerGUI
 from addonmanager_update_all_gui import UpdateAllGUI
 import addonmanager_utilities as utils
 import AddonManager_rc  # This is required by Qt, it's not unused
-from package_list import PackageList, PackageListItemModel
+from package_list import PackageListWidget, PackageListItemModel
 from package_details import PackageDetails
 from Addon import Addon
 from manage_python_dependencies import (
@@ -105,13 +105,8 @@ class CommandAddonManager:
     """The main Addon Manager class and FreeCAD command"""
 
     workers = [
-        "create_addon_list_worker",
-        "check_worker",
-        "show_worker",
         "showmacro_worker",
         "macro_worker",
-        "update_metadata_cache_worker",
-        "load_macro_metadata_worker",
         "update_all_worker",
         "check_for_python_package_updates_worker",
     ]
@@ -143,6 +138,8 @@ class CommandAddonManager:
         global INSTANCE
         INSTANCE = self
 
+        self.data_source = AddonManagerSource()
+
     def GetResources(self) -> Dict[str, str]:
         """FreeCAD-required function: get the core resource information for this Mod."""
         return {
@@ -157,7 +154,7 @@ class CommandAddonManager:
 
     def Activated(self) -> None:
         """FreeCAD-required function: called when the command is activated."""
-        NetworkManager.InitializeNetworkManager()
+        NetworkManager.GetNetworkManager()
         firstRunDialog = FirstRunDialog()
         if not firstRunDialog.exec():
             return
@@ -194,19 +191,20 @@ class CommandAddonManager:
             self.dialog.buttonUpdateAll.hide()
 
         # Set up the listing of packages using the model-view-controller architecture
-        self.packageList = PackageList(self.dialog)
+        self.addon_source = AddonManagerSource()
+        self.package_list_widget = PackageListWidget(self.dialog)
         self.item_model = PackageListItemModel()
-        self.packageList.setModel(self.item_model)
+        self.package_list_widget.setModel(self.item_model)
         self.dialog.contentPlaceholder.hide()
         self.dialog.layout().replaceWidget(
-            self.dialog.contentPlaceholder, self.packageList
+            self.dialog.contentPlaceholder, self.package_list_widget
         )
-        self.packageList.show()
+        self.package_list_widget.show()
 
         # Package details start out hidden
         self.packageDetails = PackageDetails(self.dialog)
         self.packageDetails.hide()
-        index = self.dialog.layout().indexOf(self.packageList)
+        index = self.dialog.layout().indexOf(self.package_list_widget)
         self.dialog.layout().insertWidget(index, self.packageDetails)
 
         # set nice icons to everything, by theme with fallback to FreeCAD icons
@@ -240,6 +238,8 @@ class CommandAddonManager:
             self.dialog.buttonDevTools.hide()
 
         # connect slots
+        self.addon_source.update_complete.connect(self.addon_list_update_complete)
+        self.item_model.icons_ready.connect(self.do_next_startup_phase)
         self.dialog.rejected.connect(self.reject)
         self.dialog.buttonUpdateAll.clicked.connect(self.update_all)
         self.dialog.buttonClose.clicked.connect(self.dialog.reject)
@@ -252,8 +252,8 @@ class CommandAddonManager:
             self.show_python_updates_dialog
         )
         self.dialog.buttonDevTools.clicked.connect(self.show_developer_tools)
-        self.packageList.itemSelected.connect(self.table_row_activated)
-        self.packageList.setEnabled(False)
+        self.package_list_widget.itemSelected.connect(self.table_row_activated)
+        self.package_list_widget.setEnabled(False)
         self.packageDetails.execute.connect(self.executemacro)
         self.packageDetails.install.connect(self.launch_installer_gui)
         self.packageDetails.uninstall.connect(self.remove)
@@ -481,15 +481,12 @@ class CommandAddonManager:
         # self.do_next_startup_phase if it is not launching a worker
         self.startup_sequence = [
             self.populate_packages_table,
+            self.update_icon_cache,
             self.activate_table_widgets,
-            self.populate_macros,
-            self.update_metadata_cache,
             self.check_updates,
             self.check_python_updates,
         ]
         pref = FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Addons")
-        if pref.GetBool("DownloadMacros", False):
-            self.startup_sequence.append(self.load_macro_metadata)
         selection = pref.GetString("SelectedAddon", "")
         if selection:
             self.startup_sequence.insert(
@@ -516,50 +513,27 @@ class CommandAddonManager:
             )
             pref = FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Addons")
             pref.SetString("LastCacheUpdate", date.today().isoformat())
-            self.packageList.item_filter.invalidateFilter()
+            self.package_list_widget.item_filter.invalidateFilter()
 
     def populate_packages_table(self) -> None:
-        self.item_model.clear()
-
-        use_cache = not self.update_cache
-        if use_cache:
-            if os.path.isfile(utils.get_cache_file_name("package_cache.json")):
-                with open(
-                    utils.get_cache_file_name("package_cache.json"), encoding="utf-8"
-                ) as f:
-                    data = f.read()
-                    try:
-                        from_json = json.loads(data)
-                        if len(from_json) == 0:
-                            use_cache = False
-                    except json.JSONDecodeError:
-                        use_cache = False
-            else:
-                use_cache = False
-
-        if not use_cache:
-            self.update_cache = (
-                True  # Make sure to trigger the other cache updates, if the json
-            )
-            # file was missing
-            self.create_addon_list_worker = CreateAddonListWorker()
-            self.create_addon_list_worker.status_message.connect(self.show_information)
-            self.create_addon_list_worker.addon_repo.connect(self.add_addon_repo)
-            self.update_progress_bar(10, 100)
-            self.create_addon_list_worker.finished.connect(
-                self.do_next_startup_phase
-            )  # Link to step 2
-            self.create_addon_list_worker.start()
+        if self.update_cache:
+            FreeCAD.Console.PrintLog("Updating local cache...\n")
+            self.addon_source.setup_sources(True)
+            self.addon_source.update()
         else:
-            self.create_addon_list_worker = LoadPackagesFromCacheWorker(
-                utils.get_cache_file_name("package_cache.json")
-            )
-            self.create_addon_list_worker.addon_repo.connect(self.add_addon_repo)
-            self.update_progress_bar(10, 100)
-            self.create_addon_list_worker.finished.connect(
-                self.do_next_startup_phase
-            )  # Link to step 2
-            self.create_addon_list_worker.start()
+            FreeCAD.Console.PrintLog("Using locally-cached addon data...\n")
+            self.addon_source.setup_sources(False)
+            self.addon_source.load_local_cache()
+
+    def addon_list_update_complete(self):
+        if self.addon_source.addons:
+            FreeCAD.Console.PrintLog("Addon list loaded\n")
+            self.item_model.replace_model(self.addon_source.addons)
+            self.do_next_startup_phase()
+        else:
+            FreeCAD.Console.PrintLog("Local cache was empty, forcing recache...\n")
+            self.update_cache = True
+            self.populate_packages_table()
 
     def cache_package(self, repo: Addon):
         if not hasattr(self, "package_cache"):
@@ -572,45 +546,13 @@ class CommandAddonManager:
             with open(package_cache_path, "w", encoding="utf-8") as f:
                 f.write(json.dumps(self.package_cache, indent="  "))
 
-    def activate_table_widgets(self) -> None:
-        self.packageList.setEnabled(True)
-        self.packageList.ui.lineEditFilter.setFocus()
-        self.do_next_startup_phase()
+    def update_icon_cache(self):
+        self.item_model.update_icon_cache(self.update_cache)
 
-    def populate_macros(self) -> None:
-        macro_cache_file = utils.get_cache_file_name("macro_cache.json")
-        cache_is_bad = True
-        if os.path.isfile(macro_cache_file):
-            size = os.path.getsize(macro_cache_file)
-            if size > 1000:  # Make sure there is actually data in there
-                cache_is_bad = False
-        if cache_is_bad:
-            if not self.update_cache:
-                self.update_cache = (
-                    True  # Make sure to trigger the other cache updates, if the
-                )
-                # json file was missing
-                self.create_addon_list_worker = CreateAddonListWorker()
-                self.create_addon_list_worker.status_message.connect(
-                    self.show_information
-                )
-                self.create_addon_list_worker.addon_repo.connect(self.add_addon_repo)
-                self.update_progress_bar(10, 100)
-                self.create_addon_list_worker.finished.connect(
-                    self.do_next_startup_phase
-                )  # Link to step 2
-                self.create_addon_list_worker.start()
-            else:
-                # It's already been done in the previous step (TODO: Refactor to eliminate this
-                # step)
-                self.do_next_startup_phase()
-        else:
-            self.macro_worker = LoadMacrosFromCacheWorker(
-                utils.get_cache_file_name("macro_cache.json")
-            )
-            self.macro_worker.add_macro_signal.connect(self.add_addon_repo)
-            self.macro_worker.finished.connect(self.do_next_startup_phase)
-            self.macro_worker.start()
+    def activate_table_widgets(self) -> None:
+        self.package_list_widget.setEnabled(True)
+        self.package_list_widget.ui.lineEditFilter.setFocus()
+        self.do_next_startup_phase()
 
     def cache_macro(self, repo: Addon):
         if not hasattr(self, "macro_cache"):
@@ -631,25 +573,7 @@ class CommandAddonManager:
             self.macro_cache = []
 
     def update_metadata_cache(self) -> None:
-        if self.update_cache:
-            self.update_metadata_cache_worker = UpdateMetadataCacheWorker(
-                self.item_model.repos
-            )
-            self.update_metadata_cache_worker.status_message.connect(
-                self.show_information
-            )
-            self.update_metadata_cache_worker.finished.connect(
-                self.do_next_startup_phase
-            )  # Link to step 4
-            self.update_metadata_cache_worker.progress_made.connect(
-                self.update_progress_bar
-            )
-            self.update_metadata_cache_worker.package_updated.connect(
-                self.on_package_updated
-            )
-            self.update_metadata_cache_worker.start()
-        else:
-            self.do_next_startup_phase()
+        self.do_next_startup_phase()
 
     def on_buttonUpdateCache_clicked(self) -> None:
         self.update_cache = True
@@ -672,25 +596,6 @@ class CommandAddonManager:
         with self.lock:
             repo.icon = self.get_icon(repo, update=True)
             self.item_model.reload_item(repo)
-
-    def load_macro_metadata(self) -> None:
-        if self.update_cache:
-            self.load_macro_metadata_worker = CacheMacroCodeWorker(
-                self.item_model.repos
-            )
-            self.load_macro_metadata_worker.status_message.connect(
-                self.show_information
-            )
-            self.load_macro_metadata_worker.update_macro.connect(
-                self.on_package_updated
-            )
-            self.load_macro_metadata_worker.progress_made.connect(
-                self.update_progress_bar
-            )
-            self.load_macro_metadata_worker.finished.connect(self.do_next_startup_phase)
-            self.load_macro_metadata_worker.start()
-        else:
-            self.do_next_startup_phase()
 
     def select_addon(self, name: str) -> None:
         found = False
@@ -846,8 +751,8 @@ class CommandAddonManager:
                 default_icon = QtGui.QIcon(":/icons/document-python.svg")
         elif repo.repo_type == Addon.Kind.PACKAGE:
             # The cache might not have been downloaded yet, check to see if it's there...
-            if os.path.isfile(repo.get_cached_icon_filename()):
-                path = repo.get_cached_icon_filename()
+            if os.path.isfile(repo.get_best_icon_relative_path()):
+                path = repo.get_best_icon_relative_path()
             elif repo.contains_workbench():
                 path += "_workbench_icon.svg"
                 default_icon = QtGui.QIcon(":/icons/document-package.svg")
@@ -868,7 +773,7 @@ class CommandAddonManager:
     def table_row_activated(self, selected_repo: Addon) -> None:
         """a row was activated, show the relevant data"""
 
-        self.packageList.hide()
+        self.package_list_widget.hide()
         self.packageDetails.show()
         self.packageDetails.show_repo(selected_repo)
 
@@ -879,13 +784,13 @@ class CommandAddonManager:
         self.dialog.labelStatusInfo.repaint()
 
     def show_workbench(self, repo: Addon) -> None:
-        self.packageList.hide()
+        self.package_list_widget.hide()
         self.packageDetails.show()
         self.packageDetails.show_repo(repo)
 
     def on_buttonBack_clicked(self) -> None:
         self.packageDetails.hide()
-        self.packageList.show()
+        self.package_list_widget.show()
 
     def append_to_repos_list(self, repo: Addon) -> None:
         """this function allows threads to update the main list of workbenches"""
@@ -949,7 +854,7 @@ class CommandAddonManager:
         self.dialog.labelStatusInfo.hide()
         self.dialog.progressBar.hide()
         self.dialog.buttonPauseUpdate.hide()
-        self.packageList.ui.lineEditFilter.setFocus()
+        self.package_list_widget.ui.lineEditFilter.setFocus()
 
     def show_progress_widgets(self) -> None:
         if self.dialog.progressBar.isHidden():

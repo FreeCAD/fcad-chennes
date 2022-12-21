@@ -463,8 +463,8 @@ class PackageDetails(QtWidgets.QWidget):
             self.ui.webView.load(QtCore.QUrl(url))
             self.ui.urlBar.setText(url)
         else:
-            readme_data = NetworkManager.AM_NETWORK_MANAGER.blocking_get(url)
-            text = readme_data.data().decode("utf8")
+            readme_data = utils.blocking_get(url)
+            text = readme_data.decode("utf8")
             self.ui.textBrowserReadMe.setHtml(text)
 
     def show_package(self, repo: Addon) -> None:
@@ -483,8 +483,8 @@ class PackageDetails(QtWidgets.QWidget):
             self.ui.webView.load(QtCore.QUrl(readme_url))
             self.ui.urlBar.setText(readme_url)
         else:
-            readme_data = NetworkManager.AM_NETWORK_MANAGER.blocking_get(readme_url)
-            text = readme_data.data().decode("utf8")
+            readme_data = utils.blocking_get(readme_url)
+            text = readme_data.decode("utf8")
             self.ui.textBrowserReadMe.setHtml(text)
 
     def show_macro(self, repo: Addon) -> None:
@@ -518,8 +518,8 @@ class PackageDetails(QtWidgets.QWidget):
                 )
         else:
             if url:
-                readme_data = NetworkManager.AM_NETWORK_MANAGER.blocking_get(url)
-                text = readme_data.data().decode("utf8")
+                readme_data = utils.blocking_get(url)
+                text = readme_data.decode("utf8")
                 self.ui.textBrowserReadMe.setHtml(text)
             else:
                 self.ui.textBrowserReadMe.setHtml(

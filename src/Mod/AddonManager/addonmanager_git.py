@@ -232,7 +232,6 @@ class GitManager:
         result = "(unknown remote)"
         for line in lines:
             if line.endswith("(fetch)"):
-
                 # The line looks like:
                 # origin  https://some/sort/of/path (fetch)
 
@@ -265,8 +264,14 @@ class GitManager:
         return branches
 
     def get_last_committers(self, local_path, n=10):
+<<<<<<< HEAD
         """Examine the last n entries of the commit history, and return a list of all the
         committers, their email addresses, and how many commits each one is responsible for."""
+=======
+        """Examine the last n entries of the commit history, and return a list of all of the
+        committers, their email addresses, and how many commits each one is responsible for.
+        """
+>>>>>>> 2ed2581bbe (App: Add metadata construct from buffer)
         old_dir = os.getcwd()
         os.chdir(local_path)
         authors = self._synchronous_call_git(["log", f"-{n}", "--format=%cN"]).split(
@@ -294,8 +299,14 @@ class GitManager:
         return result_dict
 
     def get_last_authors(self, local_path, n=10):
+<<<<<<< HEAD
         """Examine the last n entries of the commit history, and return a list of all the
         authors, their email addresses, and how many commits each one is responsible for."""
+=======
+        """Examine the last n entries of the commit history, and return a list of all of the
+        authors, their email addresses, and how many commits each one is responsible for.
+        """
+>>>>>>> 2ed2581bbe (App: Add metadata construct from buffer)
         old_dir = os.getcwd()
         os.chdir(local_path)
         authors = self._synchronous_call_git(["log", f"-{n}", "--format=%aN"])

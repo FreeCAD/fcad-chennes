@@ -21,6 +21,7 @@
 # *                                                                         *
 # ***************************************************************************
 
+from html import escape
 import unittest
 import os
 import tempfile
@@ -39,8 +40,10 @@ class TestMacro(unittest.TestCase):
         self.test_dir = os.path.join(
             FreeCAD.getHomePath(), "Mod", "AddonManager", "AddonManagerTest", "data"
         )
+        self.test_object = Macro("Unit Test Macro")
 
     def test_basic_metadata(self):
+        """All basic metadata entries are parsed"""
         replacements = {
             "COMMENT": "test comment",
             "WEB": "https://test.url",
@@ -57,7 +60,8 @@ class TestMacro(unittest.TestCase):
         self.assertEqual(m.date, replacements["DATE"])
         self.assertEqual(m.icon, replacements["ICON"])
 
-    def test_other_files(self):
+    def test_other_files_no_spaces(self):
+        """ "other files" list is extracted with comma separating entries"""
         replacements = {
             "FILES": "file_a,file_b,file_c",
         }
@@ -67,6 +71,8 @@ class TestMacro(unittest.TestCase):
         self.assertEqual(m.other_files[1], "file_b")
         self.assertEqual(m.other_files[2], "file_c")
 
+    def test_other_files_spaces(self):
+        """Spaces after the commas are stripped from the "other files" list"""
         replacements = {
             "FILES": "file_a, file_b, file_c",
         }
@@ -76,6 +82,8 @@ class TestMacro(unittest.TestCase):
         self.assertEqual(m.other_files[1], "file_b")
         self.assertEqual(m.other_files[2], "file_c")
 
+    def test_other_files_no_commas(self):
+        """Spaces are not delimiters for the "other files" list"""
         replacements = {
             "FILES": "file_a file_b file_c",
         }
@@ -84,6 +92,7 @@ class TestMacro(unittest.TestCase):
         self.assertEqual(m.other_files[0], "file_a file_b file_c")
 
     def test_version_from_string(self):
+        """Version is extracted from a simple string"""
         replacements = {
             "VERSION": "1.2.3",
         }
@@ -91,6 +100,7 @@ class TestMacro(unittest.TestCase):
         self.assertEqual(m.version, "1.2.3")
 
     def test_version_from_date(self):
+        """Version is correctly extracted from a date"""
         replacements = {
             "DATE": "2022-03-09",
         }
@@ -104,11 +114,12 @@ class TestMacro(unittest.TestCase):
                 output_lines.append(line)
         with open(outfile, "w") as f:
             f.write("\n".join(output_lines))
-        m = Macro("Unit Test Macro")
+        m = self.test_object
         m.fill_details_from_file(outfile)
         self.assertEqual(m.version, "2022-03-09")
 
     def test_version_from_float(self):
+        """Version is correctly extracted from a float"""
         outfile = self.generate_macro_file()
         with open(outfile) as f:
             lines = f.readlines()
@@ -119,11 +130,12 @@ class TestMacro(unittest.TestCase):
                 output_lines.append(line)
         with open(outfile, "w") as f:
             f.write("\n".join(output_lines))
-        m = Macro("Unit Test Macro")
+        m = self.test_object
         m.fill_details_from_file(outfile)
         self.assertEqual(m.version, "1.23")
 
     def test_version_from_int(self):
+        """Version is correctly extracted from an integer"""
         outfile = self.generate_macro_file()
         with open(outfile) as f:
             lines = f.readlines()
@@ -134,11 +146,12 @@ class TestMacro(unittest.TestCase):
                 output_lines.append(line)
         with open(outfile, "w") as f:
             f.write("\n".join(output_lines))
-        m = Macro("Unit Test Macro")
+        m = self.test_object
         m.fill_details_from_file(outfile)
         self.assertEqual(m.version, "1")
 
     def test_xpm(self):
+        """XPM data is recognized and stored"""
         outfile = self.generate_macro_file()
         xpm_data = """/* XPM */
 static char * blarg_xpm[] = {
@@ -159,7 +172,7 @@ static char * blarg_xpm[] = {
 
         with open(outfile, "w") as f:
             f.write(contents)
-        m = Macro("Unit Test Macro")
+        m = self.test_object
         m.fill_details_from_file(outfile)
         self.assertEqual(m.xpm, xpm_data)
 
@@ -177,55 +190,81 @@ static char * blarg_xpm[] = {
 
     def generate_macro(self, replacements: Dict[str, str] = {}) -> Macro:
         outfile = self.generate_macro_file(replacements)
-        m = Macro("Unit Test Macro")
+        m = self.test_object
         m.fill_details_from_file(outfile)
         os.unlink(outfile)
         return m
 
-    def test_fetch_raw_code_no_data(self):
-        class MockNetworkManagerNoData:
-            def __init__(self):
-                self.fetched_url = None
+    def test_parse_wiki_page_for_icon_with_icon(self):
+        """A wiki page with icon data correctly extracts the URL"""
+        icon_path = "file://localhost/some/icon.svg"
+        page_data = f"<a class=\"external text\" href=\"{icon_path}\">ToolBar Icon</a>"
+        self.test_object._parse_wiki_page_for_icon(page_data)
+        self.assertEqual(self.test_object.icon, icon_path)
 
-            def blocking_get(self, url):
-                self.fetched_url = url
-                return None
+    def test_parse_wiki_page_for_icon_without_icon(self):
+        """A wiki page with icon data correctly extracts the URL"""
+        icon_path = "file://localhost/some/icon.svg"
+        page_data = f"<a class=\"external text\" href=\"{icon_path}\">Not the magic phrase</a>"
+        self.test_object._parse_wiki_page_for_icon(page_data)
+        self.assertEqual(self.test_object.icon, "")
 
-        nmNoData = MockNetworkManagerNoData()
-        m = Macro("Unit Test Macro")
-        Macro.network_manager = nmNoData
-        returned_data = m._fetch_raw_code(
-            'rawcodeurl <a href="https://fake_url.com">Totally fake</a>'
-        )
-        self.assertIsNone(returned_data)
-        self.assertEqual(nmNoData.fetched_url, "https://fake_url.com")
+    def test_extract_item_from_description_good(self):
+        """A given item is found from the wiki page and extracted"""
 
-        nmNoData.fetched_url = None
-        returned_data = m._fetch_raw_code("Fake pagedata with no URL at all.")
-        self.assertIsNone(returned_data)
-        self.assertIsNone(nmNoData.fetched_url)
+        self.given_description()
+        result = self.test_object._extract_item_from_description("Author: ")
+        self.assertEqual(result, "Some great macro author")
 
-        Macro.network_manager = None
+    def test_extract_item_from_description_bad(self):
+        """A given item is not found from the wiki page and returns None"""
 
-    def test_fetch_raw_code_with_data(self):
-        class MockNetworkManagerWithData:
-            class MockQByteArray:
-                def data(self):
-                    return "Data returned to _fetch_raw_code".encode("utf-8")
+        self.given_description()
+        result = self.test_object._extract_item_from_description("Not in there: ")
+        self.assertIsNone(result)
 
-            def __init__(self):
-                self.fetched_url = None
+    def given_description(self):
+        page_data = """
+<td class="ctEven left macro-description">
+    <p>
+        This is some macro descriptive text.
+        <br/>
+        <br/>
+        Macro version: 2020-05-17
+        <br/>
+        FreeCAD version: 0.19
+        <br/>
+        Download: 
+        <a class="external text" href="https://someurl.com/Thing.svg">ToolBar Icon</a>
+        <br/>
+        Author: Some great macro author
+        <br/>
+    </p>
+</td>
+"""
+        description = page_data.replace("\n", " ")
+        self.test_object.desc = description
 
-            def blocking_get(self, url):
-                self.fetched_url = url
-                return MockNetworkManagerWithData.MockQByteArray()
+    def test_read_code_from_wiki_simple(self):
+        """Given a simple wiki page, extract the pre block as wiki code"""
+        html = "<html><body><pre>Some simple code</pre></body></html>"
+        self.test_object._read_code_from_wiki(html)
+        self.assertEqual(self.test_object.code, "Some simple code")
+        
+    def test_read_code_from_wiki_largest_block(self):
+        """The code read extracts the largest of all found <pre> blocks"""
+        html = "<html><body><pre>Short block</pre><pre>Longer block</pre></body></html>"
+        self.test_object._read_code_from_wiki(html)
+        self.assertEqual(self.test_object.code, "Longer block")
 
-        nmWithData = MockNetworkManagerWithData()
-        m = Macro("Unit Test Macro")
-        Macro.network_manager = nmWithData
-        returned_data = m._fetch_raw_code(
-            'rawcodeurl <a href="https://fake_url.com">Totally fake</a>'
-        )
-        self.assertEqual(returned_data, "Data returned to _fetch_raw_code")
+    def test_read_code_from_wiki_replaces_html_entities(self):
+        """HTML entities are converted back into the unicode elements"""
+        html = "<html><body><pre>" + escape("This & that") + "</pre></body></html>"
+        self.test_object._read_code_from_wiki(html)
+        self.assertEqual(self.test_object.code, "This & that")
 
-        Macro.network_manager = None
+    def test_read_code_from_wiki_replace_nonbreaking_space(self):
+        """Unicode non-breaking space (\xc2\xa0) is replaced by space"""
+        html = "<html><body><pre>Some" + b"\xc2\xa0".decode("utf-8") + "Code</pre></body></html>"
+        self.test_object._read_code_from_wiki(html)
+        self.assertEqual(self.test_object.code, "Some Code")

@@ -1203,3 +1203,4 @@ Meta::GenericMetadata::GenericMetadata(const XERCES_CPP_NAMESPACE::DOMElement* e
 App::Meta::GenericMetadata::GenericMetadata(std::string contents)
     : contents(std::move(contents))
 {}
+

@@ -28,7 +28,7 @@ from typing import List
 import FreeCAD
 
 from Addon import Addon
-import NetworkManager
+import addonmanager_utilities as utils
 
 
 class MetadataValidators:
@@ -162,13 +162,13 @@ class MetadataValidators:
                 elif url["type"] == "readme":
                     found_readme = True
                     location = url["location"]
-                    p = NetworkManager.AM_NETWORK_MANAGER.blocking_get(location)
+                    p = utils.blocking_get(location)
                     if not p:
                         errors.append(
                             f"Could not access specified readme at {location}"
                         )
                     else:
-                        p = p.data().decode("utf8")
+                        p = p.decode("utf8")
                         if "<html" in p or "<!DOCTYPE html>" in p:
                             pass
                         else:

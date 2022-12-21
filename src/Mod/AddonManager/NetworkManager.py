@@ -33,8 +33,8 @@
 #
 # USAGE
 #
-# Once imported, this file provides access to a global object called
-# AM_NETWORK_MANAGER. This is a QObject running on the main thread, but
+# Once imported, this file provides access to a global function called
+# getNetworkManager(). This gives a QObject running on the main thread, but
 # designed to be interacted with from any other application thread. It
 # provides two principal methods: submit_unmonitored_get() and
 # submit_monitored_get(). Use the unmonitored version for small amounts of
@@ -79,9 +79,7 @@ if FreeCAD.GuiUp:
     from PySide import QtWidgets
 
 
-# This is the global instance of the NetworkManager that outside code
-# should access
-AM_NETWORK_MANAGER = None
+_AM_NETWORK_MANAGER = None
 
 HAVE_QTNETWORK = True
 try:
@@ -113,9 +111,71 @@ if HAVE_QTNETWORK:
             self.original_url = request.url()
             self.track_progress = track_progress
 
+    class FileAccessManager:
+        """A faux QNAM that provides a QNAM-like interface to loading file:// URLs (so
+        that calling code can use them as if they are remote URLs). QNAM itself does
+        not support the file:// scheme."""
+
+        def __init__(self):
+            self.timer = QtCore.QTimer()
+            self.timer.setSingleShot(True)
+            self.timer.timeout.connect(self._send_reply)
+            self.queued_replies = queue.Queue()
+
+        def get(self, request: QtNetwork.QNetworkRequest):
+            reply = FileAccessReply(request.url())
+            self.queued_replies.put(reply)
+            if not self.timer.isActive():
+                self.timer.start(0)
+            return reply
+
+        def _send_reply(self):
+            while not self.queued_replies.empty():
+                reply = self.queued_replies.get()
+                reply.finished.emit()
+                self.queued_replies.task_done()
+
+    class FileAccessReply(QtCore.QObject):
+        """A "reply" class for file accesses. Only two statuses are possible: 200 if
+        the file existed and was readable, and 404 if not. It provides a minimal
+        QNetworkReply-like inteface."""
+
+        finished = QtCore.Signal()
+        redirected = QtCore.Signal()  # NEVER EMITTED
+        sslErrors = QtCore.Signal()  # NEVER EMITTED
+        readyRead = QtCore.Signal()  # NEVER EMITTED
+        downloadProgress = QtCore.Signal()  # NEVER EMITTED
+
+        def __init__(self, url):
+            super().__init__()
+            if not url.isLocalFile():
+                raise RuntimeError(f"{url.toDisplayString()} is not a local file url")
+            self.filename = url.path()
+            if self.filename[0] == "/" and ":" in self.filename:
+                # On Windows, Qt gets confused, and puts a / in front of the path, even
+                # when there is a drive letter.
+                self.filename = self.filename[1:]
+
+        def readAll(self) -> QtCore.QByteArray:
+            f = QtCore.QFile(self.filename)
+            f.open(QtCore.QIODevice.ReadOnly)
+            return f.readAll()
+
+        def error(self):
+            if not os.path.exists(self.filename):
+                return QtNetwork.QNetworkReply.NetworkError.ContentNotFoundError
+            return QtNetwork.QNetworkReply.NetworkError.NoError
+
+        def attribute(self, attr):
+            if attr == QtNetwork.QNetworkRequest.HttpStatusCodeAttribute:
+                if not os.path.exists(self.filename):
+                    return 404
+                return 200
+            return None
+
     class NetworkManager(QtCore.QObject):
         """A single global instance of NetworkManager is instantiated and stored as
-        AM_NETWORK_MANAGER. Outside threads should send GET requests to this class by
+        _AM_NETWORK_MANAGER. Outside threads should send GET requests to this class by
         calling the submit_unmonitored_request() or submit_monitored_request() function,
         as needed. See the documentation of those functions for details."""
 
@@ -161,6 +221,8 @@ if HAVE_QTNETWORK:
             self.QNAM = QtNetwork.QNetworkAccessManager()
             self.QNAM.proxyAuthenticationRequired.connect(self.__authenticate_proxy)
             self.QNAM.authenticationRequired.connect(self.__authenticate_resource)
+
+            self.FAM = FileAccessManager()
 
             qnam_cache = QtCore.QStandardPaths.writableLocation(
                 QtCore.QStandardPaths.CacheLocation
@@ -318,7 +380,10 @@ if HAVE_QTNETWORK:
             self, index: int, request: QtNetwork.QNetworkRequest
         ) -> None:
             """Given a network request, ask the QNetworkAccessManager to begin processing it."""
-            reply = self.QNAM.get(request)
+            if request.url().scheme() == "file":
+                reply = self.FAM.get(request)
+            else:
+                reply = self.QNAM.get(request)
             self.replies[index] = reply
 
             self.__last_started_index = index
@@ -333,7 +398,8 @@ if HAVE_QTNETWORK:
             """Adds this request to the queue, and returns an index that can be used by calling code
             in conjunction with the completed() signal to handle the results of the call. All data is
             kept in memory, and the completed() call includes a direct handle to the bytes returned. It
-            is not called until the data transfer has finished and the connection is closed."""
+            is not called until the data transfer has finished and the connection is closed.
+            """
 
             current_index = next(self.counting_iterator)  # A thread-safe counter
             # Use a queue because we can only put things on the QNAM from the main event loop thread
@@ -399,12 +465,9 @@ if HAVE_QTNETWORK:
                     if code == 200:
                         self.synchronous_result_data[index] = data
                     else:
-                        FreeCAD.Console.PrintWarning(
-                            translate(
-                                "AddonsInstaller",
-                                "Addon Manager: Unexpected {} response from server",
-                            ).format(code)
-                            + "\n"
+                        url = self.replies[index].url().toDisplayString()
+                        FreeCAD.Console.PrintLog(
+                            f"Addon Manager: {code} response from server at {url}\n"
                         )
                     self.synchronous_complete[index] = True
 
@@ -450,7 +513,8 @@ if HAVE_QTNETWORK:
             authenticator: QtNetwork.QAuthenticator,
         ):
             """If proxy authentication is required, attempt to authenticate. If the GUI is running this displays
-            a window asking for credentials. If the GUI is not running, it prompts on the command line."""
+            a window asking for credentials. If the GUI is not running, it prompts on the command line.
+            """
             if HAVE_FREECAD and FreeCAD.GuiUp:
                 proxy_authentication = FreeCADGui.PySideUic.loadUi(
                     os.path.join(os.path.dirname(__file__), "proxy_authentication.ui")
@@ -648,18 +712,18 @@ else:  # HAVE_QTNETWORK is false:
             """There is nothing to abort in this case"""
 
 
-def InitializeNetworkManager():
+def GetNetworkManager():
     """Called once at the beginning of program execution to create the appropriate manager object"""
-    global AM_NETWORK_MANAGER
-    if AM_NETWORK_MANAGER is None:
-        AM_NETWORK_MANAGER = NetworkManager()
+    global _AM_NETWORK_MANAGER
+    if _AM_NETWORK_MANAGER is None:
+        _AM_NETWORK_MANAGER = NetworkManager()
+    return _AM_NETWORK_MANAGER
 
 
 if __name__ == "__main__":
-
     app = QtCore.QCoreApplication()
 
-    InitializeNetworkManager()
+    nm = GetNetworkManager()
 
     count = 0
 
@@ -687,13 +751,13 @@ if __name__ == "__main__":
         count += 1
         if count >= len(urls):
             print("Shutting down...", flush=True)
-            AM_NETWORK_MANAGER.requestInterruption()
-            AM_NETWORK_MANAGER.wait(5000)
+            nm.requestInterruption()
+            nm.wait(5000)
             app.quit()
 
-    AM_NETWORK_MANAGER.completed.connect(handle_completion)
+    nm.completed.connect(handle_completion)
     for test_url in urls:
-        AM_NETWORK_MANAGER.submit_unmonitored_get(test_url)
+        nm.submit_unmonitored_get(test_url)
 
     app.exec_()
 

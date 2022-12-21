@@ -33,7 +33,6 @@ import FreeCAD
 
 from addonmanager_uninstaller import AddonUninstaller, MacroUninstaller
 
-from Addon import Addon
 from AddonManagerTest.app.mocks import MockAddon, MockMacro
 
 

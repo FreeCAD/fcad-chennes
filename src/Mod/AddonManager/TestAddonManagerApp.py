@@ -33,6 +33,9 @@ from AddonManagerTest.app.test_addon import (
 from AddonManagerTest.app.test_macro import (
     TestMacro as AddonManagerTestMacro,
 )
+from AddonManagerTest.app.test_macro_parser import (
+    TestMacroParser as AddonManagerTestMacroParser,
+)
 from AddonManagerTest.app.test_git import (
     TestGit as AddonManagerTestGit,
 )
@@ -52,7 +55,17 @@ from AddonManagerTest.app.test_freecad_interface import (
     TestParameters as AddonManagerTestParameters,
     TestDataPaths as AddonManagerTestDataPaths,
 )
-
+from AddonManagerTest.app.test_addon_source_git import (
+    TestAddonSourceGit as AddonManagerTestAddonSourceGit,
+)
+from AddonManagerTest.app.test_macro_source_wiki import (
+    TestMacroSourceWiki as AddonManagerTestMacroSourceWiki,
+    TestWikiMacroDownloader as AddonManagerTestWikiMacroDownloader,
+)
+from AddonManagerTest.app.test_source_local_cache import (
+    TestSourceLocalCache as AddonManagerTestSourceLocalCache,
+)
+from AddonManagerTest.app.test_source import TestSource as AddonManagerTestSource
 
 class TestListTerminator:
     pass
@@ -73,6 +86,11 @@ loaded_gui_tests = [
     AddonManagerTestDependencyInstaller,
     AddonManagerTestAddonUninstaller,
     AddonManagerTestMacroUninstaller,
+    AddonManagerTestAddonSourceGit,
+    AddonManagerTestMacroSourceWiki,
+    AddonManagerTestWikiMacroDownloader,
+    AddonManagerTestSourceLocalCache,
+    AddonManagerTestSource,
     AddonManagerTestConsole,
     AddonManagerTestParameters,
     AddonManagerTestDataPaths,
