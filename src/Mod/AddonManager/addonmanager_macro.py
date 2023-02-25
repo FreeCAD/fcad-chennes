@@ -31,11 +31,11 @@ import codecs
 import shutil
 from html import unescape
 from typing import Dict, Tuple, List, Union, Optional
-
-import NetworkManager
+import urllib.parse
 
 
 from addonmanager_macro_parser import MacroParser
+from addonmanager_utilities import blocking_get
 
 import addonmanager_freecad_interface as fci
 
@@ -50,10 +50,8 @@ translate = fci.translate
 
 
 class Macro:
-    """This class provides a unified way to handle macros coming from different sources"""
-
-    # Use a stored class variable for this so that we can override it during testing
-    network_manager = None
+    """This class provides a unified way to handle macros coming from different
+    sources"""
 
     # pylint: disable=too-many-instance-attributes
     def __init__(self, name):
@@ -82,8 +80,8 @@ class Macro:
 
     @classmethod
     def from_cache(cls, cache_dict: Dict):
-        """Use data from the cache dictionary to create a new macro, returning a reference
-        to it."""
+        """Use data from the cache dictionary to create a new macro, returning a
+        reference to it."""
         instance = Macro(cache_dict["name"])
         for key, value in cache_dict.items():
             instance.__dict__[key] = value
@@ -97,14 +95,6 @@ class Macro:
                 cache_dict[key] = value
         return cache_dict
 
-    @classmethod
-    def _get_network_manager(cls):
-        if cls.network_manager is None:
-            # Make sure we're initialized:
-            NetworkManager.InitializeNetworkManager()
-            cls.network_manager = NetworkManager.AM_NETWORK_MANAGER
-        return cls.network_manager
-
     @property
     def filename(self):
         """The filename of this macro"""
@@ -113,9 +103,10 @@ class Macro:
         return (self.name + ".FCMacro").replace(" ", "_")
 
     def is_installed(self):
-        """Returns True if this macro is currently installed (that is, if it exists in the
-        user macro directory), or False if it is not. Both the exact filename, as well as
-        the filename prefixed with "Macro", are considered an installation of this macro.
+        """Returns True if this macro is currently installed (that is, if it exists
+        in the user macro directory), or False if it is not. Both the exact filename
+        and the filename prefixed with "Macro" are considered an installation
+        of this macro.
         """
         if self.on_git and not self.src_filename:
             return False
@@ -140,12 +131,11 @@ class Macro:
         self.parsed = True
 
     def fill_details_from_wiki(self, url):
-        """For a given URL, download its data and attempt to get the macro's metadata out of
-        it. If the macro's code is hosted elsewhere, as specified by a "rawcodeurl" found on
-        the wiki page, that code is downloaded and used as the source."""
-        code = ""
-        nm = Macro._get_network_manager()
-        p = nm.blocking_get(url)
+        """For a given URL, download its data and attempt to get the macro's metadata
+        out of it. If the macro's code is hosted elsewhere, as specified by a
+        "rawcodeurl" found on the wiki page, that code is downloaded and used as the
+        source."""
+        p = blocking_get(url)
         if not p:
             self._console.PrintWarning(
                 translate(
@@ -155,9 +145,14 @@ class Macro:
                 + "\n"
             )
             return
-        p = p.data().decode("utf8")
+        p = p.decode("utf8")
         # check if the macro page has its code hosted elsewhere, download if
         # needed
+        self.url = url
+        self.parse_wiki_page(p)
+
+    def parse_wiki_page(self, p: str):
+        code = ""
         if "rawcodeurl" in p:
             code = self._fetch_raw_code(p)
         if not code:
@@ -187,19 +182,18 @@ class Macro:
         self.desc = desc
         self.comment, _, _ = desc.partition("<br")  # Up to the first line break
         self.comment = re.sub("<.*?>", "", self.comment)  # Strip any tags
-        self.url = url
         if isinstance(code, list):
             code = "".join(code)
         self.code = code
         self.fill_details_from_code(self.code)
         if not self.icon and not self.xpm:
-            self.parse_wiki_page_for_icon(p)
+            self._parse_wiki_page_for_icon(p)
             self.clean_icon()
 
         if not self.author:
-            self.author = self.parse_desc("Author: ")
+            self.author = self._extract_item_from_description("Author: ")
         if not self.date:
-            self.date = self.parse_desc("Last modified: ")
+            self.date = self._extract_item_from_description("Last modified: ")
 
     def _fetch_raw_code(self, page_data) -> Optional[str]:
         """Fetch code from the raw code URL specified on the wiki page."""
@@ -207,8 +201,7 @@ class Macro:
         self.raw_code_url = re.findall('rawcodeurl.*?href="(http.*?)">', page_data)
         if self.raw_code_url:
             self.raw_code_url = self.raw_code_url[0]
-            nm = Macro._get_network_manager()
-            u2 = nm.blocking_get(self.raw_code_url)
+            u2 = blocking_get(self.raw_code_url)
             if not u2:
                 self._console.PrintWarning(
                     translate(
@@ -218,15 +211,19 @@ class Macro:
                     + "\n"
                 )
                 return None
-            code = u2.data().decode("utf8")
+            code = u2.decode("utf8")
         return code
 
     @staticmethod
     def _read_code_from_wiki(p: str) -> Optional[str]:
-        code = re.findall(r"<pre>(.*?)</pre>", p.replace("\n", "--endl--"))
-        if code:
+        code_blocks: List[str] = re.findall(
+            r"<pre>(.*?)</pre>", p.replace("\n", "--endl--")
+        )
+        code = ""
+        if code_blocks:
+            code_blocks = sorted(code_blocks, key=len)
             # take the biggest code block
-            code = sorted(code, key=len)[-1]
+            code = code_blocks[-1]
             code = code.replace("--endl--", "\n")
             # Clean HTML escape codes.
             code = unescape(code)
@@ -234,12 +231,12 @@ class Macro:
         return code
 
     def clean_icon(self):
-        """Downloads the macro's icon from whatever source is specified and stores a local
-        copy, potentially updating the internal icon location to that local storage."""
+        """Downloads the macro's icon from whatever source is specified and stores a
+        local copy, potentially updating the internal icon location to that local
+        storage."""
         if self.icon.startswith("http://") or self.icon.startswith("https://"):
             self._console.PrintLog(f"Attempting to fetch macro icon from {self.icon}\n")
-            nm = Macro._get_network_manager()
-            p = nm.blocking_get(self.icon)
+            p = blocking_get(self.icon)
             if p:
                 cache_path = fci.DataPaths().cache_dir
                 am_path = os.path.join(cache_path, "AddonManager", "MacroIcons")
@@ -255,7 +252,7 @@ class Macro:
                 else:
                     constructed_name = os.path.join(am_path, base + "." + extension)
                     with open(constructed_name, "wb") as f:
-                        f.write(p.data())
+                        f.write(p)
                     self.icon_source = self.icon
                     self.icon = constructed_name
             else:
@@ -265,13 +262,14 @@ class Macro:
                 )
                 self.icon = ""
 
-    def parse_desc(self, line_start: str) -> Union[str, None]:
+    def _extract_item_from_description(self, line_start: str) -> Union[str, None]:
         """Get data from the wiki for the value specified by line_start."""
         components = self.desc.split(">")
         for component in components:
+            component = component.strip()
             if component.startswith(line_start):
                 end = component.find("<")
-                return component[len(line_start) : end]
+                return component[len(line_start) : end].strip()
         return None
 
     def install(self, macro_dir: str) -> Tuple[bool, List[str]]:
@@ -328,7 +326,7 @@ class Macro:
                 self.other_files.append(self.icon)
 
     def _copy_other_files(self, macro_dir, warnings) -> bool:
-        """Copy any specified "other files" into the install directory"""
+        """Copy any specified "other files" into the installation directory"""
         base_dir = os.path.dirname(self.src_filename)
         for other_file in self.other_files:
             if not other_file:
@@ -364,8 +362,7 @@ class Macro:
             if self.raw_code_url:
                 fetch_url = self.raw_code_url.rsplit("/", 1)[0] + "/" + other_file
                 self._console.PrintLog(f"Attempting to fetch {fetch_url}...\n")
-                nm = Macro._get_network_manager()
-                p = nm.blocking_get(fetch_url)
+                p = blocking_get(fetch_url)
                 if p:
                     with open(dst_file, "wb") as f:
                         f.write(p)
@@ -385,8 +382,9 @@ class Macro:
                     ).format(other_file, src_file)
                 )
 
-    def parse_wiki_page_for_icon(self, page_data: str) -> None:
-        """Attempt to find a url for the icon in the wiki page. Sets self.icon if found."""
+    def _parse_wiki_page_for_icon(self, page_data: str) -> None:
+        """Attempt to find a URL for the icon in the wiki page. Sets self.icon if
+        found."""
 
         # Method 1: the text "toolbar icon" appears on the page, and provides a direct
         # link to an icon
@@ -404,7 +402,8 @@ class Macro:
                     match = icon_regex.match(line)
                     if match:
                         wiki_icon = match.group(1)
-                        if "file:" not in wiki_icon.lower():
+                        parsed_url = urllib.parse.urlparse(wiki_icon)
+                        if "file:" not in parsed_url.path.lower():
                             self.icon = wiki_icon
                             return
                         break
@@ -416,10 +415,9 @@ class Macro:
             self._console.PrintLog(
                 f"Found a File: link for macro {self.name} -- {wiki_icon}\n"
             )
-            nm = Macro._get_network_manager()
-            p = nm.blocking_get(wiki_icon)
+            p = blocking_get(wiki_icon)
             if p:
-                p = p.data().decode("utf8")
+                p = p.decode("utf8")
                 f = io.StringIO(p)
                 lines = f.readlines()
                 trigger = False

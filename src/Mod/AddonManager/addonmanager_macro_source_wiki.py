@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
 # ***************************************************************************
 # *                                                                         *
 # *   Copyright (c) 2022-2023 FreeCAD Project Association                   *
@@ -46,17 +47,21 @@ Err = FreeCAD.Console.PrintLog
 
 
 class MacroFactory:
-    """A factory for producing macros. Can be replaced by testing code to produce mock Macros."""
+    """A factory for producing macros. Can be replaced by testing code to produce
+    mock Macros."""
 
-    def create_macro(self, name):
+    @staticmethod
+    def create_macro(name):
         """Standard macro creation function"""
         return Macro(name)
 
 
 class AddonFactory:
-    """A factory for producing Addons. Can be replaced by testing code to produce mock Addons."""
+    """A factory for producing Addons. Can be replaced by testing code to produce
+    mock Addons."""
 
-    def create_addon_from_macro(self, macro: Macro):
+    @staticmethod
+    def create_addon_from_macro(macro: Macro):
         """Create an addon from the Macro wrapper"""
         return Addon.from_macro(macro)
 
@@ -84,14 +89,17 @@ class MacroDataSourceWiki(QtCore.QObject):
         )
         self.blocked_macros = blocked_macros_string.split(",")
 
+    def __del__(self):
+        Log("Deleting the MacroDataSourceWiki object")
+
     def run(self):
-        """Retrieve macros from the wiki. Synchronous, but can be run inside a QThread so it
-        doesn't block the GUI while it fetches the data."""
+        """Retrieve macros from the wiki. Synchronous, but can be run inside a
+        QThread so it doesn't block the GUI while it fetches the data."""
         try:
             self._run()
         except Exception as e:
-            # We cannot let any exceptions leave this method (if it is in a QThread bad things
-            # happen) so just dump them out to the console and bail out
+            # We cannot let any exceptions leave this method (if it is in a QThread
+            # bad things happen) so just dump them out to the console and bail out
             Err("An exception was caught in MacroDataSourceWiki:\n")
             Err(str(e) + "\n")
 
@@ -151,7 +159,8 @@ class MacroDataSourceWiki(QtCore.QObject):
         return macro_names
 
     def _get_macro_lines_from_wiki(self) -> List[str]:
-        """Download the specified wiki page and get a list of lines containing macro information"""
+        """Download the specified wiki page and get a list of lines containing macro
+        information"""
         wiki_data = None
         try:
             wiki_data = utils.blocking_get(self.macro_wiki_address)
@@ -174,9 +183,9 @@ class MacroDataSourceWiki(QtCore.QObject):
         return re.findall('title="(Macro.*?)"', wiki_data)
 
     def _clean_macro_line(self, line) -> Optional[str]:
-        """Clean a single macro line, filtering out translation and recipes pages, and parsing any
-        HTML entities back into their Unicode equivalents. Strips the word "Macro " from the
-        beginning of the name."""
+        """Clean a single macro line, filtering out translation and recipes pages,
+        and parsing any HTML entities back into their Unicode equivalents. Strips the
+        word "Macro " from the beginning of the name."""
         if "translated" in line.lower() or "recipes" in line.lower():
             return None
         macro_name = line[6:]  # Remove "Macro "
@@ -184,9 +193,9 @@ class MacroDataSourceWiki(QtCore.QObject):
 
 
 class WikiMacroDownloader(QtCore.QObject):
-    """Helper class to download and parse data from the individual wiki pages of each macro.
-    Typically used asynchronously when the GUI is up: data is not available until finished() is
-    emitted, which may be after run() has returned."""
+    """Helper class to download and parse data from the individual wiki pages of each
+    macro. Typically used asynchronously when the GUI is up: data is not available
+    until finished() is emitted, which may be after run() has returned."""
 
     finished = QtCore.Signal()
 
@@ -202,8 +211,8 @@ class WikiMacroDownloader(QtCore.QObject):
             self.index = None
 
     def run(self):
-        """Begin the download process. Asynchronous if the GUI is up, wait for the finished()
-        signal before using the fetched data."""
+        """Begin the download process. Asynchronous if the GUI is up, wait for the
+        finished() signal before using the fetched data."""
         self.macro.url = self._wiki_page_url()
         if self.network_manager is not None:
             self._begin_asynchronous_fetch_of_wiki_page()

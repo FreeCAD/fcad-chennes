@@ -1,9 +1,4 @@
-<<<<<<< HEAD
-#!/usr/bin/env python
-
 # SPDX-License-Identifier: LGPL-2.1-or-later
-=======
->>>>>>> 2ed2581bbe (App: Add metadata construct from buffer)
 # ***************************************************************************
 # *                                                                         *
 # *   Copyright (c) 2022-2023 FreeCAD Project Association                   *
@@ -53,7 +48,7 @@ from addonmanager_uninstaller_gui import AddonUninstallerGUI
 from addonmanager_update_all_gui import UpdateAllGUI
 import addonmanager_utilities as utils
 import AddonManager_rc  # This is required by Qt, it's not unused
-from package_list import PackageListWidget, PackageListItemModel
+from package_list import PackageList, PackageListItemModel
 from package_details import PackageDetails
 from Addon import Addon
 from manage_python_dependencies import (
@@ -183,7 +178,7 @@ class CommandAddonManager:
         h = pref.GetInt("WindowHeight", 600)
         self.dialog.resize(w, h)
 
-        # If we are checking for updates automatically, hide the Check for updates button:
+        # If we are checking for updates automatically, hide the Check updates button:
         autocheck = pref.GetBool("AutoCheck", False)
         if autocheck:
             self.dialog.buttonCheckForUpdates.hide()
@@ -192,7 +187,7 @@ class CommandAddonManager:
 
         # Set up the listing of packages using the model-view-controller architecture
         self.addon_source = AddonManagerSource()
-        self.package_list_widget = PackageListWidget(self.dialog)
+        self.package_list_widget = PackageList(self.dialog)
         self.item_model = PackageListItemModel()
         self.package_list_widget.setModel(self.item_model)
         self.dialog.contentPlaceholder.hide()

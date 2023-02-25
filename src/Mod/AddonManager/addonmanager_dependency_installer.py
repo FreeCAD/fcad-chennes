@@ -102,17 +102,11 @@ class DependencyInstaller(QtCore.QObject):
             return False
         return True
 
-<<<<<<< HEAD
     def _install_required(self, vendor_path: str) -> bool:
         """Install the required Python package dependencies. If any fail a failure
         signal is emitted and the function exits without proceeding with any additional
         installations."""
-=======
-    def _install_required(self, vendor_path: os.PathLike) -> bool:
-        """Install the required Python package dependencies. If any fail a failure signal is
-        emitted and the function exits without proceeding with any additional installs.
-        """
->>>>>>> 2ed2581bbe (App: Add metadata construct from buffer)
+
         for pymod in self.python_requires:
             if QtCore.QThread.currentThread().isInterruptionRequested():
                 return False

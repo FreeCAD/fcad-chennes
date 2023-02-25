@@ -47,8 +47,9 @@ class GitFailed(RuntimeError):
 
 
 class GitManager:
-    """A class to manage access to git: mostly just provides a simple wrapper around the basic
-    command-line calls. Provides optional asynchronous access to clone and update."""
+    """A class to manage access to git: mostly just provides a simple wrapper around
+    the basic command-line calls. Provides optional asynchronous access to clone and
+    update."""
 
     def __init__(self):
         self.git_exe = None
@@ -193,15 +194,16 @@ class GitManager:
         return branch
 
     def repair(self, remote, local_path):
-        """Assumes that local_path is supposed to be a local clone of the given remote, and
-        ensures that it is. Note that any local changes in local_path will be destroyed. This
-        is achieved by archiving the old path, cloning an entirely new copy, and then deleting
-        the old directory."""
+        """Assumes that local_path is supposed to be a local clone of the given
+        remote, and ensures that it is. Note that any local changes in local_path
+        will be destroyed. This is achieved by archiving the old path, cloning an
+        entirely new copy, and then deleting the old directory."""
 
         original_cwd = os.getcwd()
 
-        # Make sure we are not currently in that directory, otherwise on Windows the "rename"
-        # will fail. To guarantee we aren't in it, change to it, then shift up one.
+        # Make sure we are not currently in that directory, otherwise on Windows the
+        # "rename" will fail. To guarantee we aren't in it, change to it, then shift
+        # up one.
         os.chdir(local_path)
         os.chdir("..")
         backup_path = local_path + ".backup" + str(time.time())
@@ -264,14 +266,10 @@ class GitManager:
         return branches
 
     def get_last_committers(self, local_path, n=10):
-<<<<<<< HEAD
-        """Examine the last n entries of the commit history, and return a list of all the
-        committers, their email addresses, and how many commits each one is responsible for."""
-=======
-        """Examine the last n entries of the commit history, and return a list of all of the
-        committers, their email addresses, and how many commits each one is responsible for.
-        """
->>>>>>> 2ed2581bbe (App: Add metadata construct from buffer)
+        """Examine the last n entries of the commit history, and return a list of all
+        the committers, their email addresses, and how many commits each one is
+        responsible for."""
+
         old_dir = os.getcwd()
         os.chdir(local_path)
         authors = self._synchronous_call_git(["log", f"-{n}", "--format=%cN"]).split(
@@ -299,14 +297,10 @@ class GitManager:
         return result_dict
 
     def get_last_authors(self, local_path, n=10):
-<<<<<<< HEAD
-        """Examine the last n entries of the commit history, and return a list of all the
-        authors, their email addresses, and how many commits each one is responsible for."""
-=======
-        """Examine the last n entries of the commit history, and return a list of all of the
-        authors, their email addresses, and how many commits each one is responsible for.
+        """Examine the last n entries of the commit history, and return a list of all
+        the authors, their email addresses, and how many commits each one is
+        responsible for.
         """
->>>>>>> 2ed2581bbe (App: Add metadata construct from buffer)
         old_dir = os.getcwd()
         os.chdir(local_path)
         authors = self._synchronous_call_git(["log", f"-{n}", "--format=%aN"])
@@ -327,10 +321,10 @@ class GitManager:
         return result_dict
 
     def _find_git(self):
-        # Find git. In preference order
-        #   A) The value of the GitExecutable user preference
-        #   B) The executable located in the same bin directory as FreeCAD and called "git"
-        #   C) The result of a shutil search for your system's "git" executable
+        # Find git. In preference order A) The value of the GitExecutable user
+        # preference B) The executable located in the same bin directory as FreeCAD
+        # and called "git" C) The result of a shutil search for your system's "git"
+        # executable
         prefs = FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Addons")
         git_exe = prefs.GetString("GitExecutable", "Not set")
         if not git_exe or git_exe == "Not set" or not os.path.exists(git_exe):

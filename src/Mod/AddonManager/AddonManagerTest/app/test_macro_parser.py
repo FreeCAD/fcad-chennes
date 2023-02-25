@@ -24,10 +24,11 @@
 """Tests for the MacroParser class"""
 
 import io
+import os
 import sys
 import unittest
 
-sys.path.append("../../") # So the IDE can find the classes to run with
+sys.path.append("../../")  # So the IDE can find the classes to run with
 
 from addonmanager_macro_parser import MacroParser
 from AddonManagerTest.app.mocks import MockConsole, CallCatcher, MockThread
@@ -51,7 +52,7 @@ class TestMacroParser(unittest.TestCase):
         """Test to make sure _process_line gets called as expected"""
         catcher = CallCatcher()
         self.test_object._process_line = catcher.catch_call
-        fake_macro_data = self.given_some_lines(20,10)
+        fake_macro_data = self.given_some_lines(20, 10)
         self.test_object.fill_details_from_code(fake_macro_data)
         self.assertEqual(catcher.call_count, 10)
 
@@ -60,7 +61,7 @@ class TestMacroParser(unittest.TestCase):
         catcher = CallCatcher()
         self.test_object._process_line = catcher.catch_call
         self.test_object.MAX_LINES_TO_SEARCH = 5
-        fake_macro_data = self.given_some_lines(20,10)
+        fake_macro_data = self.given_some_lines(20, 10)
         self.test_object.fill_details_from_code(fake_macro_data)
         self.assertEqual(catcher.call_count, 5)
 
@@ -324,7 +325,8 @@ class TestMacroParser(unittest.TestCase):
     #####################
 
     def test_macro_parser(self):
-        """INTEGRATION TEST: Given "real" data, ensure the parsing yields the expected results."""
+        """INTEGRATION TEST: Given "real" data, ensure the parsing yields the
+        expected results."""
         data_dir = os.path.join(os.path.dirname(__file__), "../data")
         macro_file = os.path.join(data_dir, "DoNothing.FCMacro")
         with open(macro_file, "r", encoding="utf-8") as f:

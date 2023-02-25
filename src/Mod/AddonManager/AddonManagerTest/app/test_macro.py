@@ -22,12 +22,14 @@
 # ***************************************************************************
 
 from html import escape
-import unittest
 import os
+import sys
 import tempfile
-import FreeCAD
-
 from typing import Dict
+import unittest
+
+
+sys.path.append("../../")  # So the IDE can find the classes to run with
 
 from addonmanager_macro import Macro
 
@@ -38,7 +40,7 @@ class TestMacro(unittest.TestCase):
 
     def setUp(self):
         self.test_dir = os.path.join(
-            FreeCAD.getHomePath(), "Mod", "AddonManager", "AddonManagerTest", "data"
+            os.path.dirname(__file__), "..", "data"
         )
         self.test_object = Macro("Unit Test Macro")
 
@@ -128,7 +130,7 @@ class TestMacro(unittest.TestCase):
                 if "VERSION" in line:
                     line = "__Version__ = 1.23"
                 output_lines.append(line)
-        with open(outfile, "w") as f:
+        with open(outfile, "w", encoding="utf-8") as f:
             f.write("\n".join(output_lines))
         m = self.test_object
         m.fill_details_from_file(outfile)
@@ -176,19 +178,19 @@ static char * blarg_xpm[] = {
         m.fill_details_from_file(outfile)
         self.assertEqual(m.xpm, xpm_data)
 
-    def generate_macro_file(self, replacements: Dict[str, str] = {}) -> os.PathLike:
+    def generate_macro_file(self, replacements: Dict[str, str] = None) -> str:
         with open(os.path.join(self.test_dir, "macro_template.FCStd")) as f:
             lines = f.readlines()
             outfile = tempfile.NamedTemporaryFile(mode="wt", delete=False)
             for line in lines:
-                for key, value in replacements.items():
-                    line = line.replace(key, value)
+                if replacements:
+                    for key, value in replacements.items():
+                        line = line.replace(key, value)
+                outfile.write(line + "\n")
+        outfile.close()
+        return outfile.name
 
-                outfile.write(line)
-            outfile.close()
-            return outfile.name
-
-    def generate_macro(self, replacements: Dict[str, str] = {}) -> Macro:
+    def generate_macro(self, replacements: Dict[str, str] = None) -> Macro:
         outfile = self.generate_macro_file(replacements)
         m = self.test_object
         m.fill_details_from_file(outfile)
@@ -248,23 +250,23 @@ static char * blarg_xpm[] = {
     def test_read_code_from_wiki_simple(self):
         """Given a simple wiki page, extract the pre block as wiki code"""
         html = "<html><body><pre>Some simple code</pre></body></html>"
-        self.test_object._read_code_from_wiki(html)
-        self.assertEqual(self.test_object.code, "Some simple code")
+        result = self.test_object._read_code_from_wiki(html)
+        self.assertEqual(result, "Some simple code")
         
     def test_read_code_from_wiki_largest_block(self):
         """The code read extracts the largest of all found <pre> blocks"""
         html = "<html><body><pre>Short block</pre><pre>Longer block</pre></body></html>"
-        self.test_object._read_code_from_wiki(html)
-        self.assertEqual(self.test_object.code, "Longer block")
+        result = self.test_object._read_code_from_wiki(html)
+        self.assertEqual(result, "Longer block")
 
     def test_read_code_from_wiki_replaces_html_entities(self):
         """HTML entities are converted back into the unicode elements"""
         html = "<html><body><pre>" + escape("This & that") + "</pre></body></html>"
-        self.test_object._read_code_from_wiki(html)
-        self.assertEqual(self.test_object.code, "This & that")
+        result = self.test_object._read_code_from_wiki(html)
+        self.assertEqual(result, "This & that")
 
     def test_read_code_from_wiki_replace_nonbreaking_space(self):
         """Unicode non-breaking space (\xc2\xa0) is replaced by space"""
         html = "<html><body><pre>Some" + b"\xc2\xa0".decode("utf-8") + "Code</pre></body></html>"
-        self.test_object._read_code_from_wiki(html)
-        self.assertEqual(self.test_object.code, "Some Code")
+        result = self.test_object._read_code_from_wiki(html)
+        self.assertEqual(result, "Some Code")

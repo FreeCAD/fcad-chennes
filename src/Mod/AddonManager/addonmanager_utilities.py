@@ -37,48 +37,45 @@ import zipfile
 
 from urllib.parse import urlparse
 
-from PySide import QtCore, QtWidgets
+try:
+    from PySide import QtCore, QtWidgets
+except ImportError:
+    QtCore = None
+    QtWidgets = None
 
-import FreeCAD
+try:
+    import FreeCAD
+except ImportError:
+    FreeCAD = None
 
-if FreeCAD.GuiUp:
+if FreeCAD and FreeCAD.GuiUp:
     import FreeCADGui
 
-    # If the GUI is up, we can use the NetworkManager to handle our downloads. If there is no event
-    # loop running this is not possible, so fall back to requests (if available), or the native
-    # Python urllib.request (if requests is not available).
+    # If the GUI is up, we can use the NetworkManager to handle our downloads. If
+    # there is no event loop running this is not possible, so fall back to requests (
+    # if available), or the native Python urllib.request (if requests is not available).
     import NetworkManager  # Requires an event loop, so is only available with the GUI
 
     UrlExceptionType = Exception
 else:
     try:
         import requests
-<<<<<<< HEAD
     except ImportError:
         requests = None
         import urllib.request
         import ssl
 
-=======
 
-        has_requests = True
-        UrlExceptionType = requests.RequestException
-    except ImportError:
-        has_requests = False
-        import urllib.request, urllib.error
-        import ssl
-
-        UrlExceptionType = urllib.error.URLError
-
-
->>>>>>> 2ed2581bbe (App: Add metadata construct from buffer)
 #  @package AddonManager_utilities
 #  \ingroup ADDONMANAGER
 #  \brief Utilities to work across different platforms, providers and python versions
 #  @{
 
-
-translate = FreeCAD.Qt.translate
+if FreeCAD:
+    translate = FreeCAD.Qt.translate
+else:
+    def translate(input_text):
+        return input_text
 
 
 class ProcessInterrupted(RuntimeError):
@@ -86,8 +83,8 @@ class ProcessInterrupted(RuntimeError):
 
 
 def symlink(source, link_name):
-    """Creates a symlink of a file, if possible. Note that it fails on most modern Windows
-    installations"""
+    """Creates a symlink of a file, if possible. Note that it fails on most modern
+    Windows installations"""
 
     if os.path.exists(link_name) or os.path.lexists(link_name):
         pass
@@ -96,9 +93,9 @@ def symlink(source, link_name):
         if callable(os_symlink):
             os_symlink(source, link_name)
         else:
-            # NOTE: This does not work on most normal Windows 10 and later installations, unless
-            # developer mode is turned on. Make sure to catch any exception thrown and have a
-            # fallback plan.
+            # NOTE: This does not work on most normal Windows 10 and later
+            # installations, unless developer mode is turned on. Make sure to catch
+            # any exception thrown and have a fallback plan.
             csl = ctypes.windll.kernel32.CreateSymbolicLinkW
             csl.argtypes = (ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_uint32)
             csl.restype = ctypes.c_ubyte
@@ -110,7 +107,7 @@ def symlink(source, link_name):
                 raise ctypes.WinError()
 
 
-def rmdir(path: os.PathLike) -> bool:
+def rmdir(path: str) -> bool:
     try:
         shutil.rmtree(path, onerror=remove_readonly)
     except (WindowsError, PermissionError, OSError):
@@ -147,10 +144,11 @@ def update_macro_details(old_macro, new_macro):
 
 
 def remove_directory_if_empty(dir_to_remove):
-    """Remove the directory if it is empty, with one exception: the directory returned by
-    FreeCAD.getUserMacroDir(True) will not be removed even if it is empty."""
+    """Remove the directory if it is empty, with one exception: the directory
+    returned by FreeCAD.getUserMacroDir(True) will not be removed even if it is
+    empty."""
 
-    if dir_to_remove == FreeCAD.getUserMacroDir(True):
+    if FreeCAD and dir_to_remove == FreeCAD.getUserMacroDir(True):
         return
     if not os.listdir(dir_to_remove):
         os.rmdir(dir_to_remove)
@@ -158,6 +156,9 @@ def remove_directory_if_empty(dir_to_remove):
 
 def restart_freecad():
     """Shuts down and restarts FreeCAD"""
+
+    if not QtCore or not QtWidgets or not FreeCAD:
+        return
 
     args = QtWidgets.QApplication.arguments()[1:]
     if FreeCADGui.getMainWindow().close():
@@ -183,8 +184,8 @@ def get_zip_url(repo):
 
 
 def recognized_git_location(repo) -> bool:
-    """Returns whether this repo is based at a known git repo location: works with github, gitlab,
-    framagit, and salsa.debian.org"""
+    """Returns whether this repo is based at a known git repo location: works with
+    github, gitlab, framagit, and salsa.debian.org"""
 
     parsed_url = urlparse(repo.url)
     return parsed_url.netloc in [
@@ -230,8 +231,8 @@ def get_metadata_url(url):
 
 
 def get_desc_regex(repo):
-    """Returns a regex string that extracts a WB description to be displayed in the description
-    panel of the Addon manager, if the README could not be found"""
+    """Returns a regex string that extracts a WB description to be displayed in the
+    description panel of the Addon manager, if the README could not be found"""
 
     parsed_url = urlparse(repo.url)
     if parsed_url.netloc == "github.com":
@@ -267,24 +268,27 @@ def is_darkmode() -> bool:
 
 
 def warning_color_string() -> str:
-    """A shade of red, adapted to darkmode if possible. Targets a minimum 7:1 contrast ratio."""
+    """A shade of red, adapted to darkmode if possible. Targets a minimum 7:1
+    contrast ratio."""
     return "rgb(255,105,97)" if is_darkmode() else "rgb(215,0,21)"
 
 
 def bright_color_string() -> str:
-    """A shade of green, adapted to darkmode if possible. Targets a minimum 7:1 contrast ratio."""
+    """A shade of green, adapted to darkmode if possible. Targets a minimum 7:1
+    contrast ratio."""
     return "rgb(48,219,91)" if is_darkmode() else "rgb(36,138,61)"
 
 
 def attention_color_string() -> str:
-    """A shade of orange, adapted to darkmode if possible. Targets a minimum 7:1 contrast ratio."""
+    """A shade of orange, adapted to darkmode if possible. Targets a minimum 7:1
+    contrast ratio."""
     return "rgb(255,179,64)" if is_darkmode() else "rgb(255,149,0)"
 
 
 def get_assigned_string_literal(line: str) -> Optional[str]:
-    """Look for a line of the form my_var = "A string literal" and return the string literal.
-    If the assignment is of a floating point value, that value is converted to a string
-    and returned. If neither is true, returns None."""
+    """Look for a line of the form my_var = "A string literal" and return the string
+    literal. If the assignment is of a floating point value, that value is converted
+    to a string and returned. If neither is true, returns None."""
 
     string_search_regex = re.compile(r"\s*(['\"])(.*)\1")
     _, _, after_equals = line.partition("=")
@@ -297,8 +301,8 @@ def get_assigned_string_literal(line: str) -> Optional[str]:
 
 
 def get_macro_version_from_file(filename: str) -> str:
-    """Get the version of the macro from a local macro file. Supports strings, ints, and floats,
-    as well as a reference to __date__"""
+    """Get the version of the macro from a local macro file. Supports strings, ints,
+    and floats, as well as a reference to __date__"""
 
     date = ""
     with open(filename, errors="ignore", encoding="utf-8") as f:
@@ -314,8 +318,8 @@ def get_macro_version_from_file(filename: str) -> str:
                 if match:
                     return match
                 if "__date__" in line.lower():
-                    # Don't do any real syntax checking, just assume the line is something
-                    # like __version__ = __date__
+                    # Don't do any real syntax checking, just assume the line is
+                    # something like __version__ = __date__
                     if date:
                         return date
                     # pylint: disable=line-too-long,consider-using-f-string
@@ -420,17 +424,10 @@ def get_cache_file_name(file: str) -> str:
 
 
 def blocking_get(url: str, method=None) -> bytes:
-    """Wrapper around three possible ways of accessing data, depending on the current run mode and
-    Python installation. Blocks until complete, and returns the results of the call if it
-    succeeded, or an empty bytes object if it failed, or returned no data. The method argument is
-    provided mainly for testing purposes."""
-<<<<<<< HEAD
-    p = ""
-    if FreeCAD.GuiUp and method is None or method == "networkmanager":
-        NetworkManager.InitializeNetworkManager()
-        p = NetworkManager.AM_NETWORK_MANAGER.blocking_get(url)
-    elif requests and method is None or method == "requests":
-=======
+    """Wrapper around three possible ways of accessing data, depending on the current
+    run mode and Python installation. Blocks until complete, and returns the results
+    of the call if it succeeded, or an empty bytes object if it failed, or returned
+    no data. The method argument is provided mainly for testing purposes."""
     p = bytes()
     parsed_url = urlparse(url)
     if parsed_url.scheme == "file":
@@ -446,8 +443,7 @@ def blocking_get(url: str, method=None) -> bytes:
         p = nm.blocking_get(url)
         if p is not None and hasattr(p, "data"):
             p = p.data()
-    elif has_requests and method is None or method == "requests":
->>>>>>> 2ed2581bbe (App: Add metadata construct from buffer)
+    elif requests and method is None or method == "requests":
         response = requests.get(url)
         if response.status_code == 200:
             p = response.raw
@@ -483,7 +479,7 @@ def run_interruptable_subprocess(args) -> subprocess.CompletedProcess:
             stdout, stderr = p.communicate(timeout=0.1)
             return_code = p.returncode
         except subprocess.TimeoutExpired:
-            if QtCore.QThread.currentThread().isInterruptionRequested():
+            if QtCore and QtCore.QThread.currentThread().isInterruptionRequested():
                 p.kill()
                 raise ProcessInterrupted()
     if return_code is None or return_code != 0:
@@ -492,12 +488,16 @@ def run_interruptable_subprocess(args) -> subprocess.CompletedProcess:
 
 
 def get_main_am_window():
+
+    if not QtCore or not QtWidgets:
+        return
+
     windows = QtWidgets.QApplication.topLevelWidgets()
     for widget in windows:
         if widget.objectName() == "AddonManager_Main_Window":
             return widget
-    # If there is no main AM window, we may be running unit tests: see if the Test Runner window
-    # exists:
+    # If there is no main AM window, we may be running unit tests: see if the Test
+    # Runner window exists:
     for widget in windows:
         if widget.objectName() == "TestGui__UnitTest":
             return widget
@@ -517,11 +517,11 @@ def clean_git_url(repo):
     repo["name"] = repo["url"].split("/")[-1]
 
 
-def extract_git_repo_zipfile(zip_data, destination: os.PathLike, branch: str = ""):
-    """Extract a zipfile into a given destination, possibly moving its contents from a subdirectory
-    called "branch" into the toplevel (used for sites like GitHub that place the data in a
-    subdirectory named for the current branch). zip_data may be either a path to a local zipfile,
-    or a bytes-like object containing zip data."""
+def extract_git_repo_zipfile(zip_data, destination: str, branch: str = ""):
+    """Extract a zipfile into a given destination, possibly moving its contents from
+    a subdirectory called "branch" into the toplevel (used for sites like GitHub that
+    place the data in a subdirectory named for the current branch). zip_data may be
+    either a path to a local zipfile, or a bytes-like object containing zip data."""
     if isinstance(zip_data, str) and os.path.exists(zip_data):
         zip_file_like = io.FileIO(zip_data)
     else:
@@ -529,9 +529,9 @@ def extract_git_repo_zipfile(zip_data, destination: os.PathLike, branch: str = "
     with zipfile.ZipFile(zip_file_like, "r") as zfile:
         zfile.extractall(destination)
 
-    # GitHub (and possibly other hosts) put all files in the zip into a subdirectory named
-    # after the branch. If that is the setup that we just extracted, move all files out of
-    # that subdirectory.
+    # GitHub (and possibly other hosts) put all files in the zip into a subdirectory
+    # named after the branch. If that is the setup that we just extracted, move all
+    # files out of that subdirectory.
     directory_contents = os.listdir(destination)
     if len(directory_contents) == 1 and directory_contents[0].endswith(branch):
         subdirectory = directory_contents[0]

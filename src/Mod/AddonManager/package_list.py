@@ -61,14 +61,9 @@ class StatusFilter(IntEnum):
     UPDATE_AVAILABLE = 3
 
 
-<<<<<<< HEAD
 class PackageList(QtWidgets.QWidget):
     """A widget that shows a list of packages and various widgets to control the
     display of the list"""
-=======
-class PackageListWidget(QtWidgets.QWidget):
-    """A widget that shows a list of packages and various widgets to control the display of the list"""
->>>>>>> 2ed2581bbe (App: Add metadata construct from buffer)
 
     itemSelected = QtCore.Signal(Addon)
 
@@ -208,13 +203,6 @@ class PackageListItemModel(QtCore.QAbstractListModel):
 
     repos = []
     write_lock = threading.Lock()
-
-<<<<<<< HEAD
-    DataAccessRole = QtCore.Qt.UserRole
-    StatusUpdateRole = QtCore.Qt.UserRole + 1
-    IconUpdateRole = QtCore.Qt.UserRole + 2
-
-=======
     icons_ready = QtCore.Signal()
 
     DataAccessRole = QtCore.Qt.UserRole
@@ -257,7 +245,6 @@ class PackageListItemModel(QtCore.QAbstractListModel):
         FreeCAD.Console.PrintLog("New icons are available\n")
         self.icons_ready.emit()
 
->>>>>>> 2ed2581bbe (App: Add metadata construct from buffer)
     def rowCount(self, parent: QtCore.QModelIndex = QtCore.QModelIndex()) -> int:
         """The number of rows"""
         if parent.isValid():
@@ -347,18 +334,6 @@ class PackageListItemModel(QtCore.QAbstractListModel):
                 )
                 return
 
-<<<<<<< HEAD
-    def update_item_icon(self, name: str, icon: QtGui.QIcon) -> None:
-        """Set the icon for Addon with name to icon"""
-        for row, item in enumerate(self.repos):
-            if item.name == name:
-                self.setData(
-                    self.index(row, 0), icon, PackageListItemModel.IconUpdateRole
-                )
-                return
-
-=======
->>>>>>> 2ed2581bbe (App: Add metadata construct from buffer)
     def reload_item(self, repo: Addon) -> None:
         """Sets the addon data for the given addon (based on its name)"""
         for index, item in enumerate(self.repos):
@@ -413,19 +388,11 @@ class PackageListItemDelegate(QtWidgets.QStyledItemDelegate):
         if self.displayStyle == ListDisplayStyle.EXPANDED:
             self.widget = self.expanded
             self.widget.ui.labelPackageName.setText(f"<h1>{repo.display_name}</h1>")
-<<<<<<< HEAD
-            self.widget.ui.labelIcon.setPixmap(repo.icon.pixmap(QtCore.QSize(48, 48)))
-        else:
-            self.widget = self.compact
-            self.widget.ui.labelPackageName.setText(f"<b>{repo.display_name}</b>")
-            self.widget.ui.labelIcon.setPixmap(repo.icon.pixmap(QtCore.QSize(16, 16)))
-=======
             self.widget.ui.labelIcon.setPixmap(icon.pixmap(QtCore.QSize(48, 48)))
         else:
             self.widget = self.compact
             self.widget.ui.labelPackageName.setText(f"<b>{repo.display_name}</b>")
             self.widget.ui.labelIcon.setPixmap(icon.pixmap(QtCore.QSize(16, 16)))
->>>>>>> 2ed2581bbe (App: Add metadata construct from buffer)
 
         self.widget.ui.labelIcon.setText("")
         if self.displayStyle == ListDisplayStyle.EXPANDED:
@@ -654,13 +621,9 @@ class PackageListFilter(QtCore.QSortFilterProxyModel):
         left = self.sourceModel().data(left_in, PackageListItemModel.DataAccessRole)
         right = self.sourceModel().data(right_in, PackageListItemModel.DataAccessRole)
 
-<<<<<<< HEAD
         return left.display_name.lower() < right.display_name.lower()
 
     def filterAcceptsRow(self, row, _parent=QtCore.QModelIndex()):
-=======
-    def filterAcceptsRow(self, row, parent=QtCore.QModelIndex()):
->>>>>>> 2ed2581bbe (App: Add metadata construct from buffer)
         """Do the actual filtering (called automatically by Qt when drawing the list)"""
 
         index = self.sourceModel().createIndex(row, 0)
@@ -767,7 +730,6 @@ class PackageListFilter(QtCore.QSortFilterProxyModel):
 class Ui_PackageList():
     """The contents of the PackageList widget"""
 
-<<<<<<< HEAD
     def setupUi(self, form):
         if not form.objectName():
             form.setObjectName("PackageList")
@@ -776,16 +738,6 @@ class Ui_PackageList():
         self.horizontalLayout_6 = QtWidgets.QHBoxLayout()
         self.horizontalLayout_6.setObjectName("horizontalLayout_6")
         self.buttonCompactLayout = QtWidgets.QToolButton(form)
-=======
-    def setupUi(self, Form):
-        if not Form.objectName():
-            Form.setObjectName("PackageList")
-        self.verticalLayout = QtWidgets.QVBoxLayout(Form)
-        self.verticalLayout.setObjectName("verticalLayout")
-        self.horizontalLayout_6 = QtWidgets.QHBoxLayout()
-        self.horizontalLayout_6.setObjectName("horizontalLayout_6")
-        self.buttonCompactLayout = QtWidgets.QToolButton(Form)
->>>>>>> 2ed2581bbe (App: Add metadata construct from buffer)
         self.buttonCompactLayout.setObjectName("buttonCompactLayout")
         self.buttonCompactLayout.setCheckable(True)
         self.buttonCompactLayout.setAutoExclusive(True)
@@ -797,11 +749,7 @@ class Ui_PackageList():
 
         self.horizontalLayout_6.addWidget(self.buttonCompactLayout)
 
-<<<<<<< HEAD
         self.buttonExpandedLayout = QtWidgets.QToolButton(form)
-=======
-        self.buttonExpandedLayout = QtWidgets.QToolButton(Form)
->>>>>>> 2ed2581bbe (App: Add metadata construct from buffer)
         self.buttonExpandedLayout.setObjectName("buttonExpandedLayout")
         self.buttonExpandedLayout.setCheckable(True)
         self.buttonExpandedLayout.setChecked(True)
@@ -814,20 +762,12 @@ class Ui_PackageList():
 
         self.horizontalLayout_6.addWidget(self.buttonExpandedLayout)
 
-<<<<<<< HEAD
         self.labelPackagesContaining = QtWidgets.QLabel(form)
-=======
-        self.labelPackagesContaining = QtWidgets.QLabel(Form)
->>>>>>> 2ed2581bbe (App: Add metadata construct from buffer)
         self.labelPackagesContaining.setObjectName("labelPackagesContaining")
 
         self.horizontalLayout_6.addWidget(self.labelPackagesContaining)
 
-<<<<<<< HEAD
         self.comboPackageType = QtWidgets.QComboBox(form)
-=======
-        self.comboPackageType = QtWidgets.QComboBox(Form)
->>>>>>> 2ed2581bbe (App: Add metadata construct from buffer)
         self.comboPackageType.addItem("")
         self.comboPackageType.addItem("")
         self.comboPackageType.addItem("")
@@ -836,20 +776,12 @@ class Ui_PackageList():
 
         self.horizontalLayout_6.addWidget(self.comboPackageType)
 
-<<<<<<< HEAD
         self.labelStatus = QtWidgets.QLabel(form)
-=======
-        self.labelStatus = QtWidgets.QLabel(Form)
->>>>>>> 2ed2581bbe (App: Add metadata construct from buffer)
         self.labelStatus.setObjectName("labelStatus")
 
         self.horizontalLayout_6.addWidget(self.labelStatus)
 
-<<<<<<< HEAD
         self.comboStatus = QtWidgets.QComboBox(form)
-=======
-        self.comboStatus = QtWidgets.QComboBox(Form)
->>>>>>> 2ed2581bbe (App: Add metadata construct from buffer)
         self.comboStatus.addItem("")
         self.comboStatus.addItem("")
         self.comboStatus.addItem("")
@@ -858,32 +790,20 @@ class Ui_PackageList():
 
         self.horizontalLayout_6.addWidget(self.comboStatus)
 
-<<<<<<< HEAD
         self.lineEditFilter = QtWidgets.QLineEdit(form)
-=======
-        self.lineEditFilter = QtWidgets.QLineEdit(Form)
->>>>>>> 2ed2581bbe (App: Add metadata construct from buffer)
         self.lineEditFilter.setObjectName("lineEditFilter")
         self.lineEditFilter.setClearButtonEnabled(True)
 
         self.horizontalLayout_6.addWidget(self.lineEditFilter)
 
-<<<<<<< HEAD
         self.labelFilterValidity = QtWidgets.QLabel(form)
-=======
-        self.labelFilterValidity = QtWidgets.QLabel(Form)
->>>>>>> 2ed2581bbe (App: Add metadata construct from buffer)
         self.labelFilterValidity.setObjectName("labelFilterValidity")
 
         self.horizontalLayout_6.addWidget(self.labelFilterValidity)
 
         self.verticalLayout.addLayout(self.horizontalLayout_6)
 
-<<<<<<< HEAD
         self.listPackages = QtWidgets.QListView(form)
-=======
-        self.listPackages = QtWidgets.QListView(Form)
->>>>>>> 2ed2581bbe (App: Add metadata construct from buffer)
         self.listPackages.setObjectName("listPackages")
         self.listPackages.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
         self.listPackages.setProperty("showDropIndicator", False)
@@ -897,11 +817,7 @@ class Ui_PackageList():
 
         self.retranslateUi(form)
 
-<<<<<<< HEAD
         QtCore.QMetaObject.connectSlotsByName(form)
-=======
-        QtCore.QMetaObject.connectSlotsByName(Form)
->>>>>>> 2ed2581bbe (App: Add metadata construct from buffer)
 
     def retranslateUi(self, _):
         self.labelPackagesContaining.setText(

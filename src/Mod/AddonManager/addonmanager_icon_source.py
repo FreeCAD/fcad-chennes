@@ -110,7 +110,7 @@ class IconSource(QtCore.QObject):
         self.direct_update_thread = None
         self.addons = []
         self.q_icons: Dict[str, QtGui.QIcon] = {}
-        self.console = None if FreeCAD is None else self.console
+        self.console = None if FreeCAD is None else FreeCAD.Console
 
     def __del__(self):
         self._quit_thread(self.cache_update_thread)

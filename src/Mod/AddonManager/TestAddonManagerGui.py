@@ -49,18 +49,11 @@ from AddonManagerTest.gui.test_icon_source import (
     TestMacroDirectUpdater as AddonManagerTestMacroDirectUpdater,
 )
 
-<<<<<<< HEAD
 
 class TestListTerminator:
     pass
 
 
-# Basic usage mostly to get static analyzers to stop complaining about unused imports
-loaded_gui_tests = [
-    AddonManagerTestGui,
-    AddonManagerTestWorkersUtility,
-    AddonManagerTestWorkersStartup,
-=======
 # Basic usage mostly to get static analyzers to stop complaining about unused imports
 try:
     import FreeCAD
@@ -72,26 +65,16 @@ except ImportError:
 loaded_gui_tests = [
     AddonManagerTestGui,
     AddonManagerTestWorkersUtility,
->>>>>>> 2ed2581bbe (App: Add metadata construct from buffer)
     AddonManagerTestInstallerGui,
     AddonManagerTestMacroInstallerGui,
     AddonManagerTestUpdateAllGui,
     AddonManagerTestUninstallerGUI,
-<<<<<<< HEAD
-    TestListTerminator  # Needed to prevent the last test from running twice
-]
-for test in loaded_gui_tests:
-    fci.Console.PrintLog(f"Loaded tests from {test.__name__}\n")
-=======
     AddonManagerTestIconSource,
     AddonManagerTestCacheUpdater,
     AddonManagerTestDirectUpdater,
     AddonManagerTestIndividualDirectUpdater,
     AddonManagerTestMacroDirectUpdater,
-    None,  # Stop extractor from deciding to re-add the last item in this list as another test
+    TestListTerminator  # Needed to prevent the last test from running twice
 ]
-if FreeCAD:
-    for test in loaded_gui_tests:
-        if test is not None:
-            print_func(f"Loaded tests from {test.__name__}\n")
->>>>>>> 2ed2581bbe (App: Add metadata construct from buffer)
+for test in loaded_gui_tests:
+    fci.Console.PrintLog(f"Loaded tests from {test.__name__}\n")
