@@ -45,13 +45,16 @@ try:
     getUserAppDataDir = FreeCAD.getUserAppDataDir
     getUserMacroDir = FreeCAD.getUserMacroDir
     getUserCachePath = FreeCAD.getUserCachePath
+    getHomePath = FreeCAD.getHomePath
     translate = FreeCAD.Qt.translate
+    gui_up = FreeCAD.GuiUp
 
 except ImportError:
     FreeCAD = None
     getUserAppDataDir = None
     getUserCachePath = None
     getUserMacroDir = None
+    gui_up = False
 
     def translate(_context: str, string: str, _desc: str = "") -> str:
         return string
@@ -140,6 +143,7 @@ class DataPaths:
     mod_dir = None
     macro_dir = None
     cache_dir = None
+    home_dir = None  # Not the user's home dir: the FreeCAD installation's
 
     reference_count = 0
 
@@ -151,6 +155,8 @@ class DataPaths:
                 self.cache_dir = getUserCachePath()
             if self.macro_dir is None:
                 self.macro_dir = getUserMacroDir(True)
+            if self.home_dir is None:
+                self.home_dir = getHomePath()
         else:
             self.reference_count += 1
             if self.mod_dir is None:
@@ -159,6 +165,8 @@ class DataPaths:
                 self.cache_dir = tempfile.mkdtemp()
             if self.macro_dir is None:
                 self.macro_dir = tempfile.mkdtemp()
+            if self.home_dir is None:
+                self.home_dir = os.path.join(os.path.dirname(__file__), "..", "..")
 
     def __del__(self):
         self.reference_count -= 1
