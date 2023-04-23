@@ -35,6 +35,9 @@ inputs:
   reportFile:
     description: "Report file"
     required: true
+  testName:
+    description: "A descriptive name for the test suite"
+    required: true
 
 runs:
   using: "composite"
@@ -49,9 +52,9 @@ runs:
         result=$(sed -ne "/Global test environment tear-down/,/^$/{/^$/d;p}" ${{ inputs.testLogFile }})
         if [ $(echo $result | grep -F "[  FAILED  ]") ]
         then
-          echo "<details><summary>:fire: GTest C++ unit test suite failed</summary>" >> ${{ inputs.reportFile }}
+          echo "<details><summary>:fire: GTest C++ unit test suite '${{inputs.testName}}' failed</summary>" >> ${{ inputs.reportFile }}
         else
-          echo "<details><summary>:heavy_check_mark: GTest C++ unit test suite succeeded</summary>" >> ${{ inputs.reportFile }}
+          echo "<details><summary>:heavy_check_mark: GTest C++ unit test suite '${{inputs.testName}}' succeeded</summary>" >> ${{ inputs.reportFile }}
         fi
         echo "" >> ${{ inputs.reportFile }}
         echo "Results" >> ${{ inputs.reportFile }}
