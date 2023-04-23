@@ -200,22 +200,9 @@ jobs:
           testCommand: xvfb-run ${{ env.builddir }}/bin/FreeCAD -t 0
           logFile: ${{ env.logdir }}TestGUIBuild.log
           reportFile: ${{env.reportdir}}${{ env.reportfilename }}
-      - name: C++ core unit tests
+      - name: C++ tests
         timeout-minutes: 1
-        uses: ./.github/workflows/actions/runCPPTests
-        with:
-          testCommand: ${{ env.builddir }}/tests/Tests_run --gtest_output=json:${{env.reportdir}}core_gtest_results.json
-          testLogFile: ${{env.reportdir}}core_gtest_test_log.txt
-          reportFile: ${{env.reportdir}}${{ env.reportfilename }}
-          testName: Core
-      - name: C++ Sketcher unit tests
-        timeout-minutes: 1
-        uses: ./.github/workflows/actions/runCPPTests
-        with:
-          testCommand: ${{ env.builddir }}/tests/Sketcher_tests_run --gtest_output=json:${{env.reportdir}}sketcher_gtest_results.json
-          testLogFile: ${{env.reportdir}}sketcher_gtest_test_log.txt
-          reportFile: ${{env.reportdir}}${{ env.reportfilename }}
-          testName: Sketcher
+        uses: ./.github/workflows/actions/runCPPTests/runAllTests
       - name: CMake Install
         uses: ./.github/workflows/actions/linux/install
         with:
